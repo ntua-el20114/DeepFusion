@@ -102,10 +102,15 @@ criterion_dict = {
 if torch.cuda.is_available():
     if args.no_cuda:
         print("WARNING: You have a CUDA device, so you should probably not run with --no_cuda")
+        torch.set_default_device('cpu')
     else:
         torch.cuda.manual_seed(args.seed)
-        #torch.set_default_tensor_type('torch.cuda.FloatTensor')
+        torch.set_default_device('cuda')
         use_cuda = True
+else:
+    torch.set_default_device('cpu')
+
+device = torch.device('cuda' if use_cuda else 'cpu')    
 
 ####################################################################
 #
@@ -119,9 +124,13 @@ train_data = get_data(args, dataset, 'train')
 valid_data = get_data(args, dataset, 'valid')
 test_data = get_data(args, dataset, 'test')
    
-train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
-valid_loader = DataLoader(valid_data, batch_size=args.batch_size, shuffle=True)
-test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=True)
+generator = torch.Generator(device=device)
+train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, 
+                          generator=generator if use_cuda else None)
+valid_loader = DataLoader(valid_data, batch_size=args.batch_size, shuffle=True,
+                          generator=generator if use_cuda else None)
+test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=True,
+                         generator=generator if use_cuda else None)
 
 print('Finish loading the data....')
 if not args.aligned:
@@ -132,6 +141,7 @@ if not args.aligned:
 # Hyperparameters
 #
 ####################################################################
+
 
 hyp_params = args
 hyp_params.orig_d_l, hyp_params.orig_d_a, hyp_params.orig_d_v = train_data.get_dim()
@@ -145,8 +155,8 @@ hyp_params.n_train, hyp_params.n_valid, hyp_params.n_test = len(train_data), len
 hyp_params.model = str.upper(args.model.strip())
 hyp_params.output_dim = output_dim_dict.get(dataset, 1)
 hyp_params.criterion = criterion_dict.get(dataset, 'L1Loss')
+hyp_params.device = device
 
 
 if __name__ == '__main__':
     test_loss = train.initiate(hyp_params, train_loader, valid_loader, test_loader)
-
