@@ -42,6 +42,15 @@ parser.add_argument('--res_dropout', type=float, default=0.1,
 parser.add_argument('--out_dropout', type=float, default=0.0,
                     help='output layer dropout')
 
+# Multimodal Hard Masking parameters
+parser.add_argument('--mask_prob', type=float, default=0.3,
+                    help='probability to hard‐drop one modality per sample/timestep')
+parser.add_argument('--p_mod', type=float, nargs='+', default=None,
+                    help='list of per‐modality mask probabilities; defaults to uniform')
+parser.add_argument('--m3_sequential', action='store_true',
+                    help='if set, mask modalities independently at each timestep')
+                    
+
 # Architecture
 parser.add_argument('--nlevels', type=int, default=5,
                     help='number of layers in the network (default: 5)')
