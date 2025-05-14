@@ -213,7 +213,7 @@ class MULTModel(nn.Module):
            m3_sequential=hyp_params.m3_sequential
        )
 
-
+       
        # Define dimensions for crossmodal attention output
        self.crossmodal_dim_l = 2 * self.d_l  # from combining two crossmodal attentions
        self.crossmodal_dim_a = 2 * self.d_a
@@ -225,8 +225,6 @@ class MULTModel(nn.Module):
        # Define the output dimension
        output_dim = hyp_params.output_dim
       
-       # Hidden dimension for fusion
-       self.fusion_dim = 128  # You can adjust this hyperparameter
       
        # 1. Temporal convolutional layers
        self.proj_l = nn.Conv1d(self.orig_d_l, self.d_l, kernel_size=1, padding=0, bias=False)
@@ -252,6 +250,8 @@ class MULTModel(nn.Module):
       
        # 4. Fusion (only if selected)
        # GMU for combining all modalities
+       self.concat_dim = 2 * (self.d_l + self.d_a + self.d_v) 
+       self.fusion_dim = self.concat_dim  # Hidden dimension for fusion
        self.use_gmu = hyp_params.gmu
        if self.use_gmu and self.partial_mode == 3:  # All three modalities
            self.modality_gmu = GatedMultimodalUnit(
@@ -273,7 +273,7 @@ class MULTModel(nn.Module):
                self.single_modality_proj = nn.Linear(self.crossmodal_dim_v, self.fusion_dim)
       
        # Final prediction layers
-       self.concat_dim = 2 * (self.d_l + self.d_a + self.d_v)  # = 180
+  
        self.single_dim = 2 * (self.d_l if self.lonly else (self.d_a if self.aonly else self.d_v))
        if self.use_gmu:
           fusion_in_dim = self.fusion_dim
@@ -282,16 +282,11 @@ class MULTModel(nn.Module):
        else:
             fusion_in_dim = self.single_dim
 
+    
+
        # final MLP
-       """
-       Concat‐path uses Linear(180 -> 128) -> Linear(128 -> 128) -> Linear(128 -> out)
-
-       Single‐path uses Linear(60 -> 128) -> …
-
-       GMU‐path uses Linear(128 -> 128) -> …
-       """
-       self.proj1     = nn.Linear(fusion_in_dim, self.fusion_dim)
-       self.proj2     = nn.Linear(self.fusion_dim, self.fusion_dim)
+       self.proj1 = nn.Linear(self.concat_dim, self.concat_dim)
+       self.proj2 = nn.Linear(self.concat_dim, self.concat_dim)
        self.out_layer = nn.Linear(self.fusion_dim, hyp_params.output_dim)
 
 
@@ -454,7 +449,7 @@ class MULTModel(nn.Module):
        # second projection
        fused_proj = self.proj2(z)                      # [B, fusion_dim]
        # residual add of the *projected* skip
-       fused_proj = fused_proj + z                     # [B, fusion_dim]
+       fused_proj = fused_proj + fused_representation   
       
        # Final prediction
        output = self.out_layer(fused_proj)
