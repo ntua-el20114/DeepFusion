@@ -54,6 +54,9 @@ parser.add_argument('--m3_sequential', action='store_true',
 parser.add_argument('--regbn', action='store_true', 
                     help='Enable RegBN regularization')  
 
+# GMU
+parser.add_argument('--gmu', action='store_true',
+                    help='use Gated Multimodal Unit for fusion (default: concat)')
 # Architecture
 parser.add_argument('--nlevels', type=int, default=5,
                     help='number of layers in the network (default: 5)')
