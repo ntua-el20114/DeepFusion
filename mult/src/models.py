@@ -273,9 +273,26 @@ class MULTModel(nn.Module):
                self.single_modality_proj = nn.Linear(self.crossmodal_dim_v, self.fusion_dim)
       
        # Final prediction layers
-       self.proj1 = nn.Linear(self.fusion_dim, self.fusion_dim)
-       self.proj2 = nn.Linear(self.fusion_dim, self.fusion_dim)
-       self.out_layer = nn.Linear(self.fusion_dim, output_dim)
+       self.concat_dim = 2 * (self.d_l + self.d_a + self.d_v)  # = 180
+       self.single_dim = 2 * (self.d_l if self.lonly else (self.d_a if self.aonly else self.d_v))
+       if self.use_gmu:
+          fusion_in_dim = self.fusion_dim
+       elif self.partial_mode == 3:
+          fusion_in_dim = self.concat_dim
+       else:
+            fusion_in_dim = self.single_dim
+
+       # final MLP
+       """
+       Concat‐path uses Linear(180 -> 128) -> Linear(128 -> 128) -> Linear(128 -> out)
+
+       Single‐path uses Linear(60 -> 128) -> …
+
+       GMU‐path uses Linear(128 -> 128) -> …
+       """
+       self.proj1     = nn.Linear(fusion_in_dim, self.fusion_dim)
+       self.proj2     = nn.Linear(self.fusion_dim, self.fusion_dim)
+       self.out_layer = nn.Linear(self.fusion_dim, hyp_params.output_dim)
 
 
    def get_network(self, self_type='l', layers=-1):
@@ -337,7 +354,7 @@ class MULTModel(nn.Module):
 
         return f_norm, g_norm
 
-   def forward(self, x_l, x_a, x_v):
+   def forward(self, x_l, x_a, x_v, epoch=None, steps_per_epoch=None):
        """
        text, audio, and vision should have dimension [batch_size, seq_len, n_features]
        """
@@ -415,9 +432,9 @@ class MULTModel(nn.Module):
            if self.use_gmu: # use gmu only when selected
                 fused_representation, gates = self.modality_gmu(last_h_l, last_h_a, last_h_v)
                 modal_weights = gates
-            else:
+           else:
                 fused_representation = torch.cat([last_h_l, last_h_a, last_h_v], dim=1)
-                modal_weights = torch.tensor([[1/3,1/3,1/3]], device=fused.device)
+                modal_weights = torch.tensor([[1/3,1/3,1/3]], device=fused_representation.device)
        elif self.partial_mode == 1:  # Only one modality is active
            if self.lonly:
                fused_representation = self.single_modality_proj(last_h_l)
@@ -430,9 +447,14 @@ class MULTModel(nn.Module):
                modal_weights = torch.tensor([0.0, 0.0, 1.0]).to(last_h_v.device)
       
        # A residual block
-       fused_proj = self.proj2(F.dropout(F.relu(self.proj1(fused_representation)),
-                              p=self.out_dropout, training=self.training))
-       fused_proj += fused_representation
+       # reduce to fusion_dim
+       z = self.proj1(fused_representation)            # [B, fusion_dim]
+       # nonlinear + dropout
+       z = F.dropout(F.relu(z), p=self.out_dropout, training=self.training)
+       # second projection
+       fused_proj = self.proj2(z)                      # [B, fusion_dim]
+       # residual add of the *projected* skip
+       fused_proj = fused_proj + z                     # [B, fusion_dim]
       
        # Final prediction
        output = self.out_layer(fused_proj)
