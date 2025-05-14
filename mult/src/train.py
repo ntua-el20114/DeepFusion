@@ -87,6 +87,7 @@ def train_model(settings, hyp_params, train_loader, valid_loader, test_loader):
         epoch_loss = 0
         model.train()
         num_batches = hyp_params.n_train // hyp_params.batch_size
+        steps_per_epoch = (hyp_params.n_train + hyp_params.batch_size - 1) // hyp_params.batch_size     # for RegBN
         proc_loss, proc_size = 0, 0
         start_time = time.time()
         for i_batch, (batch_X, batch_Y, batch_META) in enumerate(train_loader):
@@ -145,7 +146,7 @@ def train_model(settings, hyp_params, train_loader, valid_loader, test_loader):
                 for i in range(batch_chunk):
                     text_i, audio_i, vision_i = text_chunks[i], audio_chunks[i], vision_chunks[i]
                     eval_attr_i = eval_attr_chunks[i]
-                    preds_i, hiddens_i = net(text_i, audio_i, vision_i)
+                    preds_i, hiddens_i = net(text_i, audio_i, vision_i, epoch, steps_per_epoch)
                     
                     if hyp_params.dataset == 'iemocap':
                         preds_i = preds_i.view(-1, 2)
@@ -156,7 +157,7 @@ def train_model(settings, hyp_params, train_loader, valid_loader, test_loader):
                 ctc_loss.backward()
                 combined_loss = raw_loss + ctc_loss
             else:
-                preds, hiddens = net(text, audio, vision)
+                preds, hiddens = net(text, audio, vision, epoch, steps_per_epoch)
                 if hyp_params.dataset == 'iemocap':
                     preds = preds.view(-1, 2)
                     eval_attr = eval_attr.view(-1)

@@ -49,7 +49,10 @@ parser.add_argument('--p_mod', type=float, nargs='+', default=None,
                     help='list of per‐modality mask probabilities; defaults to uniform')
 parser.add_argument('--m3_sequential', action='store_true',
                     help='if set, mask modalities independently at each timestep')
-                    
+
+# RegBN (True/False)
+parser.add_argument('--regbn', action='store_true', 
+                    help='Enable RegBN regularization')  
 
 # Architecture
 parser.add_argument('--nlevels', type=int, default=5,

@@ -3,11 +3,9 @@ from torch import nn
 import torch.nn.functional as F
 from typing import List, Optional
 import random
-
+from .regbn import RegBN
 
 from modules.transformer import TransformerEncoder
-
-
 
 
 class GatedMultimodalUnit(nn.Module):
@@ -48,9 +46,6 @@ class GatedMultimodalUnit(nn.Module):
 
 
        return h_fusion, gates
-
-
-
 
 class HardMultimodalMasking(nn.Module):
    def __init__(
@@ -192,6 +187,21 @@ class MULTModel(nn.Module):
        self.embed_dropout = hyp_params.embed_dropout
        self.attn_mask = hyp_params.attn_mask
 
+       # RegBN Normalization Layer
+       self.do_regbn = hyp_params.regbn
+       self.regbn = regbn = RegBN(
+           gpu=0 if hyp_params.device.type == 'cuda' else -1,
+           f_num_channels= 50*30,
+           g_num_channels= 50*30,
+           f_layer_dim=[],
+           g_layer_dim=[],
+           normalize_input=True,
+           normalize_output=True,
+           affine=True,
+           sigma_THR=0.01,
+           sigma_MIN=1e-6,
+           verbose=True
+       ).to(hyp_params.device)
 
        # multimodal masking layer (hard masking)
        # p = probability to mask one modality per sample/timestep
@@ -289,6 +299,40 @@ class MULTModel(nn.Module):
                                  embed_dropout=self.embed_dropout,
                                  attn_mask=self.attn_mask)
           
+   def apply_regbn(self, f: torch.Tensor, g: torch.Tensor, is_training: bool,
+                    epoch: int, steps_per_epoch: int):
+        """
+        f, g: shape (L, N, d)
+        """
+        L, N, C_f = f.size()
+        _, _, C_g = g.size()
+
+        # flatten the input tensors
+        f_flattened = f.permute(1, 0, 2).reshape(N, L * C_f)
+        g_flattened = g.permute(1, 0, 2).reshape(N, L * C_g)
+
+        # apply RegBN
+        if is_training:
+            f_norm_p, g_norm_p = self.regbn(
+                f_flattened,
+                g_flattened,
+                is_training=True,
+                n_epoch=epoch,
+                steps_per_epoch=steps_per_epoch
+            )
+        else:
+            f_norm_p, g_norm_p = self.regbn(
+                f_flattened,
+                g_flattened,
+                is_training=False
+            )
+
+        # reshape to original dimentions
+        f_norm = f_norm_p.reshape(f.size(1), f.size(0), f.size(2)).permute(1, 0, 2)
+        g_norm = g_norm_p.reshape(g.size(1), g.size(0), g.size(2)).permute(1, 0, 2)
+
+        return f_norm, g_norm
+
    def forward(self, x_l, x_a, x_v):
        """
        text, audio, and vision should have dimension [batch_size, seq_len, n_features]
@@ -314,36 +358,53 @@ class MULTModel(nn.Module):
        last_h_l = last_h_a = last_h_v = None
       
        if self.lonly:
-           # (V,A) --> L
-           h_l_with_as = self.trans_l_with_a(proj_x_l, proj_x_a, proj_x_a)    # Dimension (L, N, d_l)
-           h_l_with_vs = self.trans_l_with_v(proj_x_l, proj_x_v, proj_x_v)    # Dimension (L, N, d_l)
-           h_ls = torch.cat([h_l_with_as, h_l_with_vs], dim=2)
-           h_ls = self.trans_l_mem(h_ls)
-           if type(h_ls) == tuple:
-               h_ls = h_ls[0]
-           last_h_l = h_ls[-1]   # Take the last output for prediction
+            # (V,A) --> L
+            if self.do_regbn: # Apply RegBN before modality pair fusion
+                proj_x_l_norm_a, proj_x_a_norm_a = self.apply_regbn(proj_x_l, proj_x_a, self.training, epoch, steps_per_epoch)
+                proj_x_l_norm_v, proj_x_v_norm_v = self.apply_regbn(proj_x_l, proj_x_v, self.training, epoch, steps_per_epoch)                
+                h_l_with_as = self.trans_l_with_a(proj_x_l_norm_a, proj_x_a_norm_a, proj_x_a_norm_a)    # Dimension (L, N, d_l)
+                h_l_with_vs = self.trans_l_with_v(proj_x_l_norm_v, proj_x_v_norm_v, proj_x_v_norm_v)    # Dimension (L, N, d_l)
+            else:
+                h_l_with_as = self.trans_l_with_a(proj_x_l, proj_x_a, proj_x_a)    # Dimension (L, N, d_l)
+                h_l_with_vs = self.trans_l_with_v(proj_x_l, proj_x_v, proj_x_v)    # Dimension (L, N, d_l)
 
+            h_ls = torch.cat([h_l_with_as, h_l_with_vs], dim=2)
+            h_ls = self.trans_l_mem(h_ls)
+            if type(h_ls) == tuple:
+                h_ls = h_ls[0]
+            last_h_l = last_hs = h_ls[-1]   # Take the last output for prediction
 
        if self.aonly:
-           # (L,V) --> A
-           h_a_with_ls = self.trans_a_with_l(proj_x_a, proj_x_l, proj_x_l)
-           h_a_with_vs = self.trans_a_with_v(proj_x_a, proj_x_v, proj_x_v)
-           h_as = torch.cat([h_a_with_ls, h_a_with_vs], dim=2)
-           h_as = self.trans_a_mem(h_as)
-           if type(h_as) == tuple:
-               h_as = h_as[0]
-           last_h_a = h_as[-1]
-
+            # (L,V) --> A
+            if self.do_regbn:
+                proj_x_a_norm_l, proj_x_l_norm_l = self.apply_regbn(proj_x_a, proj_x_l, self.training, epoch, steps_per_epoch)
+                proj_x_a_norm_v, proj_x_v_norm_v = self.apply_regbn(proj_x_a, proj_x_v, self.training, epoch, steps_per_epoch)
+                h_a_with_ls = self.trans_a_with_l(proj_x_a_norm_l, proj_x_l_norm_l, proj_x_l_norm_l)
+                h_a_with_vs = self.trans_a_with_v(proj_x_a_norm_v, proj_x_v_norm_v, proj_x_v_norm_v)
+            else:
+                h_a_with_ls = self.trans_a_with_l(proj_x_a, proj_x_l, proj_x_l)
+                h_a_with_vs = self.trans_a_with_v(proj_x_a, proj_x_v, proj_x_v)
+            h_as = torch.cat([h_a_with_ls, h_a_with_vs], dim=2)
+            h_as = self.trans_a_mem(h_as)
+            if type(h_as) == tuple:
+                h_as = h_as[0]
+            last_h_a = last_hs = h_as[-1]
 
        if self.vonly:
-           # (L,A) --> V
-           h_v_with_ls = self.trans_v_with_l(proj_x_v, proj_x_l, proj_x_l)
-           h_v_with_as = self.trans_v_with_a(proj_x_v, proj_x_a, proj_x_a)
-           h_vs = torch.cat([h_v_with_ls, h_v_with_as], dim=2)
-           h_vs = self.trans_v_mem(h_vs)
-           if type(h_vs) == tuple:
-               h_vs = h_vs[0]
-           last_h_v = h_vs[-1]
+            # (L,A) --> V
+            if self.do_regbn:
+                proj_x_v_norm_l, proj_x_l_norm_l = self.apply_regbn(proj_x_v, proj_x_l, self.training, epoch, steps_per_epoch)
+                proj_x_v_norm_a, proj_x_a_norm_a = self.apply_regbn(proj_x_v, proj_x_a, self.training, epoch, steps_per_epoch)
+                h_v_with_ls = self.trans_v_with_l(proj_x_v_norm_l, proj_x_l_norm_l, proj_x_l_norm_l)
+                h_v_with_as = self.trans_v_with_a(proj_x_v_norm_a, proj_x_a_norm_a, proj_x_a_norm_a)
+            else:
+                h_v_with_ls = self.trans_v_with_l(proj_x_v, proj_x_l, proj_x_l)
+                h_v_with_as = self.trans_v_with_a(proj_x_v, proj_x_a, proj_x_a)
+            h_vs = torch.cat([h_v_with_ls, h_v_with_as], dim=2)
+            h_vs = self.trans_v_mem(h_vs)
+            if type(h_vs) == tuple:
+                h_vs = h_vs[0]
+            last_h_v = last_hs = h_vs[-1]
       
        # Apply Gated Multimodal Unit for fusion
        if self.partial_mode == 3:  # All three modalities
