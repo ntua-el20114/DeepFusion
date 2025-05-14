@@ -250,16 +250,20 @@ class MULTModel(nn.Module):
        self.trans_a_mem = self.get_network(self_type='a_mem', layers=3)
        self.trans_v_mem = self.get_network(self_type='v_mem', layers=3)
       
-       # 4. Gated Multimodal Fusion
+       # 4. Fusion (only if selected)
        # GMU for combining all modalities
-       if self.partial_mode == 3:  # All three modalities
+       self.use_gmu = hyp_params.gmu
+       if self.use_gmu and self.partial_mode == 3:  # All three modalities
            self.modality_gmu = GatedMultimodalUnit(
                dim_l=self.crossmodal_dim_l,
                dim_a=self.crossmodal_dim_a,
                dim_v=self.crossmodal_dim_v,
-               output_dim=self.fusion_dim
-           )
-       elif self.partial_mode == 1:  # Only one modality
+               output_dim=self.fusion_dim)
+           
+       else:
+              pass
+              
+       if self.partial_mode == 1:  # Only one modality (no need for GMU)
            # In case only one modality is used, we'll handle it differently
            if self.lonly:
                self.single_modality_proj = nn.Linear(self.crossmodal_dim_l, self.fusion_dim)
@@ -408,9 +412,12 @@ class MULTModel(nn.Module):
       
        # Apply Gated Multimodal Unit for fusion
        if self.partial_mode == 3:  # All three modalities
-           fused_representation, gates = self.modality_gmu(last_h_l, last_h_a, last_h_v)
-           # Store gates for analysis
-           modal_weights = gates
+           if self.use_gmu: # use gmu only when selected
+                fused_representation, gates = self.modality_gmu(last_h_l, last_h_a, last_h_v)
+                modal_weights = gates
+            else:
+                fused_representation = torch.cat([last_h_l, last_h_a, last_h_v], dim=1)
+                modal_weights = torch.tensor([[1/3,1/3,1/3]], device=fused.device)
        elif self.partial_mode == 1:  # Only one modality is active
            if self.lonly:
                fused_representation = self.single_modality_proj(last_h_l)
@@ -433,5 +440,5 @@ class MULTModel(nn.Module):
        # Store modality weights as an attribute for later inspection
        self.last_modal_weights = modal_weights
       
-       # Return only output and fused_representation to maintain compatibility with original interface
+       # Return output and fused_representation 
        return output, fused_representation
