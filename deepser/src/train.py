@@ -35,7 +35,7 @@ def initiate(hyp_params, train_loader, valid_loader, test_loader):
     if hyp_params.use_cuda:
         model = model.cuda()
 
-    optimizer = getattr(optim, hyp_params.optim)(model.parameters(), lr=hyp_params.lr)
+    optimizer = getattr(optim, hyp_params.optim)(model.parameters(), lr=1e-5)
     criterion = getattr(nn, hyp_params.criterion)()
     if hyp_params.aligned or hyp_params.model=='MULT':
         ctc_criterion = None
