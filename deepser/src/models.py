@@ -24,9 +24,9 @@ class DeepSERModel(nn.Module):
        self.m3 = HardMultimodalMasking(p=m3_p, n_modalities=3)
       
        # Unimodal encoders (ENCh, ENCg, ENCz)
-       self.enc_h = MultimodalEncoder(dim_h, hidden_dim, dropout)
-       self.enc_g = MultimodalEncoder(dim_g, hidden_dim, dropout) 
-       self.enc_z = MultimodalEncoder(dim_z, hidden_dim, dropout)
+       self.enc_h = UnimodalEncoder(dim_h, hidden_dim, dropout)
+       self.enc_g = UnimodalEncoder(dim_g, hidden_dim, dropout) 
+       self.enc_z = UnimodalEncoder(dim_z, hidden_dim, dropout)
       
        # First fusion layer: f^(1) = ENCf^(1)(h1||g1||z1) using GMU
        self.fusion_gmu_1 = ThreeWayGMU(hidden_dim, hidden_dim, hidden_dim, hidden_dim, dropout)
