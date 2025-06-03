@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 # Import modular components
 from modules.m3 import HardMultimodalMasking
 from modules.gmu import ThreeWayGMU, FourWayGMU, TwoWayGMU  
-from modules.encoders import MultimodalEncoder, FusionEncoder
+from modules.encoders import UnimodalEncoder, FusionEncoder
 from modules.attention import MultiHeadAttention
 from modules.mixup import mixup_features
 
