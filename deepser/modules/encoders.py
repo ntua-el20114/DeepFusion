@@ -13,7 +13,7 @@ class MeanPooling(nn.Module):
 class UnimodalEncoder(nn.Module):
     """Three-layer encoder for each modality following DeepSER structure"""
     def __init__(self, embed_dim, hidden_dim, dropout=0.1):
-        super(MultimodalEncoder, self).__init__()
+        super(UnimodalEncoder, self).__init__()
         
         # Layer 1
         self.layer1_linear = nn.Linear(embed_dim, hidden_dim)
