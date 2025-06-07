@@ -83,7 +83,7 @@ class BaseEnc(nn.Module):
             ff_dim (int): Dimensionality of the feed-forward layer.
             dropout (float): Dropout rate.
         """
-        super(DeepLeg, self).__init__()
+        super(BaseEnc, self).__init__()
 
         self.linear1 = nn.Linear(embed_dim, mlp_out)
         self.relu = nn.ReLU()
