@@ -5,10 +5,97 @@ from typing import List, Optional, Tuple
 # Import modular components
 from modules.m3 import HardMultimodalMasking
 from modules.gmu import ThreeWayGMU, FourWayGMU, TwoWayGMU  
-from modules.encoders import UnimodalEncoder, FusionEncoder
+from modules.encoders import DeepLeg, UnimodalEncoder, FusionEncoder
 from modules.attention import MultiHeadAttention
 from modules.mixup import mixup_features
 
+
+class DeepSERBase(nn.Module):
+    def __init__(self, embed_dim1, mlp_out1, embed_dim2, mlp_out2, embed_dim3, mlp_out3, mlp_out4, encoder = "code", dropout=0.1, mixup=0.0):
+        """
+
+        DON'T CHANGE THIS MODEL
+        -----------------------
+        This is here for refrence to the original model.
+        If you want to perform any changes, make a designated copy.
+
+        The original DeepSER model, as implemented in the medusa repo (class DeepTriSkeletonMulti).
+
+        Note that this model uses the original DeepLeg encoder from the repo, that seems to disagree with the 
+        paper description of the model. To use an encoder that follows the paper, you can use the parameter:
+
+        encoder = "code"/"paper"
+        code: use the DeepLeg encoder, like the original repo
+        paper: use a custom encoder that follows the paper description (not yet implemented)
+
+
+        You can call this model through the MultModel wrapper, using the parameters:
+        
+        self.model = DeepSERBase(
+            embed_dim1=self.orig_d_l,    # Language/text modality input dimension
+            mlp_out1=hidden_dim,         # Output dimension for first leg
+            embed_dim2=self.orig_d_a,    # Audio modality input dimension  
+            mlp_out2=hidden_dim,         # Output dimension for second leg
+            embed_dim3=self.orig_d_v,    # Visual modality input dimension
+            mlp_out3=hidden_dim,         # Output dimension for third leg
+            mlp_out4=hidden_dim,         # Final output dimension for legs 4&5
+            encoder="code",              # Use original encoder implementation
+            dropout=dropout,             # Dropout rate
+            mixup=mixup                  # Mixup probability
+        )
+ 
+        """
+
+        super(DeepSERBase, self).__init__()
+
+        self.mixup = mixup
+
+        self.leg1 = DeepLeg(embed_dim1, mlp_out1)
+        self.leg2 = DeepLeg(embed_dim2, mlp_out2)
+        self.leg3 = DeepLeg(embed_dim3, mlp_out3)
+        self.leg4 = DeepLeg(mlp_out1, mlp_out4)
+        self.leg5 = DeepLeg(mlp_out1, mlp_out4)
+
+        self.linear1 = nn.Linear(mlp_out1 + mlp_out2 + mlp_out3 + mlp_out4, mlp_out4)
+        self.relu = nn.ReLU()
+        self.linear2 = nn.Linear(mlp_out4, 8)
+        self.linear3 = nn.Linear(mlp_out4, 3)
+        # self.softmax = nn.Softmax(dim=-1)
+
+
+    def forward(self, x1, x2, x3, labels=None, dev=False):
+        x1, f1, s1 = self.leg1(x1)
+        x2, f2, s2 = self.leg2(x2)
+        x3, f3, s3 = self.leg3(x3)
+
+        cf = torch.cat((f1,f2,f3), dim = 1)
+
+        xc1, fc1, sc1 = self.leg4(cf)
+
+        cs = torch.cat((s1,s2,s3,sc1), dim = 1)
+
+        xc2, fc2, sc2 = self.leg5(cs)
+
+        x = torch.cat((x1, x2, x3, xc2), dim=-1)
+
+        x = self.linear1(x)
+
+        p = torch.rand(size=(1,), device=x.device)
+
+        if p < self.mixup and labels is not None and not dev:
+            x, labels = mixup_features(x, labels)
+
+        x = self.relu(x)
+        y = self.linear3(x)
+
+        x = self.linear2(x)
+        y = 1 + 6*torch.sigmoid(y)
+        # x = self.softmax(x)
+        
+        if self.mixup > 0.0 and labels is not None and not dev:
+            return x, y, labels
+        else:
+            return x, y
 
 
 class DeepSERModel(nn.Module):
@@ -168,16 +255,19 @@ class MULTModel(nn.Module):
        m3_p = hyp_params.m3_p if hasattr(hyp_params, 'm3_p') else 0.4
       
        # Initialize DeepSER model
-       self.model = DeepSERModel(
-           dim_h=self.orig_d_l,  # Language as h
-           dim_g=self.orig_d_a,  # Audio as g 
-           dim_z=self.orig_d_v,  # Vision as z
-           hidden_dim=hidden_dim,
-           dropout=dropout,
-           mixup=mixup,
-           m3_p=m3_p
-       )
-      
+       self.model = DeepSERBase(
+            embed_dim1=self.orig_d_l,    # Language/text modality input dimension
+            mlp_out1=hidden_dim,         # Output dimension for first leg
+            embed_dim2=self.orig_d_a,    # Audio modality input dimension  
+            mlp_out2=hidden_dim,         # Output dimension for second leg
+            embed_dim3=self.orig_d_v,    # Visual modality input dimension
+            mlp_out3=hidden_dim,         # Output dimension for third leg
+            mlp_out4=hidden_dim,         # Final output dimension for legs 4&5
+            encoder="code",              # Use original encoder implementation
+            dropout=dropout,             # Dropout rate
+            mixup=mixup                  # Mixup probability
+        )
+
        # Output dimension compatibility
        self.output_dim = hyp_params.output_dim
        if self.output_dim != 8:
@@ -198,12 +288,12 @@ class MULTModel(nn.Module):
        Maps inputs to h, g, z as per DeepSER naming convention
        """
        # Process through DeepSER model (x_l->h, x_a->g, x_v->z)
-       class_out, reg_out, modal_weights = self.model(x_l, x_a, x_v, labels, dev)
+       class_out, reg_out = self.model(x_l, x_a, x_v, labels, dev)
       
        # Update modal weights and attention weights
-       self.last_modal_weights = modal_weights
-       if hasattr(self.model, 'last_attention_weights'):
-           self.last_attention_weights = self.model.last_attention_weights
+    #    self.last_modal_weights = modal_weights
+    #    if hasattr(self.model, 'last_attention_weights'):
+    #        self.last_attention_weights = self.model.last_attention_weights
       
        # Apply output projection if needed
        if hasattr(self, 'output_layer'):
