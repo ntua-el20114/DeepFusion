@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 # Import modular components
 from modules.m3 import HardMultimodalMasking
 from modules.gmu import ThreeWayGMU, FourWayGMU, TwoWayGMU  
-from modules.encoders import DeepLeg, BaseEnc, UnimodalEncoder, FusionEncoder
+from modules.encoders import MeanPooling, DeepLeg, BaseEnc, VarDepthEnc, UnimodalEncoder, FusionEncoder
 from modules.attention import MultiHeadAttention
 from modules.mixup import mixup_features
 
@@ -87,6 +87,88 @@ class DeepSERBase(nn.Module):
 
         x = torch.cat((x1, x2, x3, xc2), dim=-1)
 
+        x = self.linear1(x)
+
+        p = torch.rand(size=(1,), device=x.device)
+
+        if p < self.mixup and labels is not None and not dev:
+            x, labels = mixup_features(x, labels)
+
+        x = self.relu(x)
+        y = self.linear3(x)
+
+        x = self.linear2(x)
+        y = 1 + 6*torch.sigmoid(y)
+        # x = self.softmax(x)
+        
+        if self.mixup > 0.0 and labels is not None and not dev:
+            return x, y, labels
+        else:
+            return x, y
+
+
+class VarDepthDeepSER(nn.Module):
+    def __init__(self, embed_dim1, mlp_out1, embed_dim2, mlp_out2, embed_dim3, mlp_out3, mlp_out4, prepool=2, postpool=0, dropout=0.1, mixup=0.0):
+        """
+        A modified DeepSER model that allows for variable depth in the encoders.
+
+        prepool (int): Number of Transformer layers before pooling.
+        postpool (int): Number of Transformer layers after pooling.
+
+        (The original DeepSER would have prepool=2 and postpool=0)
+
+        Note: for now, the
+        """
+
+        super(VarDepthDeepSER, self).__init__()
+
+        self.prepool = prepool
+        self.postpool = postpool
+
+        self.mixup = mixup
+
+        self.linear1 = nn.Linear(mlp_out1 + mlp_out2 + mlp_out3 + mlp_out4, mlp_out4)
+        self.relu = nn.ReLU()
+        self.linear2 = nn.Linear(mlp_out4, 8)
+        self.linear3 = nn.Linear(mlp_out4, 3)
+
+        self.leg1 = VarDepthEnc(embed_dim1, mlp_out1, prepool, postpool)
+        self.leg2 = VarDepthEnc(embed_dim2, mlp_out2, prepool, postpool)
+        self.leg3 = VarDepthEnc(embed_dim3, mlp_out3, prepool, postpool)
+
+        self.prepool_fusion = [VarDepthEnc(embed_dim3, mlp_out3, prepool, postpool) for _ in range(prepool)]
+        self.postpool_fusion = [nn.Linear for _ in range(postpool)]
+
+
+    def forward(self, x1, x2, x3, labels=None, dev=False):
+        h = self.leg1(x1)
+        g = self.leg2(x2)
+        z = self.leg3(x3)
+
+        for i in range(self.prepool):
+            if i==0:
+                c = torch.cat((h[i], g[i], z[i]), dim=1)
+            else:
+                c = torch.cat((h[i], g[i], z[i], f), dim=1) # concat with previous fusion output
+
+            # pass concatenated vectors through the fusion encoder
+            f = self.prepool_fusion[i](c)
+
+            if i == self.prepool-1:
+                f = f[-1] # keep the last (pooled) representation
+            else:
+                f = f[self.prepool-1] # keep the last unpooled representation
+
+        for i in range(self.postpool):
+            c = torch.cat(h[self.prepool+i], g[self.prepool+i], z[self.prepool+i], f, dim=1)
+
+            # pass concatenated vectors through the fusion encoder
+            f = self.postpool_fusion[i](c)
+
+        # Concatenate the outputs of the three legs and the final fusion output
+        x = torch.cat((h[-1], g[-1], z[-1], f), dim=-1)
+
+        # Continue with the original DeepSER forward pass
         x = self.linear1(x)
 
         p = torch.rand(size=(1,), device=x.device)

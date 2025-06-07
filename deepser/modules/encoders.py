@@ -92,7 +92,6 @@ class BaseEnc(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(d_model=mlp_out, nhead=1, batch_first=True)
         self.transformer1 = nn.TransformerEncoder(encoder_layer, num_layers=2, enable_nested_tensor=False)
 
-        self.transformer2 = nn.TransformerEncoder(encoder_layer, num_layers=1, enable_nested_tensor=False)
         self.pooling = MeanPooling()
 
     def forward(self, x):
@@ -110,9 +109,6 @@ class BaseEnc(nn.Module):
         x = self.linear1(x)
         x = self.relu(x)
         x = self.linear2(x)
-        
-        # print(x.shape)
-        x = self.transformer1(x)
 
         f = self.transformer1.layers[0](x)   # h1 <- TransformerLayer(x)
         s = self.transformer1.layers[-1](f)  # h2 <- TransformerLayer(h1)
@@ -120,6 +116,62 @@ class BaseEnc(nn.Module):
         
         return x, f, s
 
+
+class VarDepthEnc(nn.Module):
+    def __init__(self, embed_dim, mlp_out, prepool=2, postpool=0, dropout=0.1):
+        """
+        A BaseEnc encoder, with the ability to vary the depth of the Transformer layers.
+        The original BaseEnc would have prepool=2 and postpool=0.
+
+        Args:
+            embed_dim (int): Dimensionality of input and output embeddings.
+            ff_dim (int): Dimensionality of the feed-forward layer.
+            prepool: int): Number of Transformer layers before pooling.
+            postpool (int): Number of Transformer layers after pooling.
+            dropout (float): Dropout rate.
+        """
+        super(VarDepthEnc, self).__init__()
+        assert prepool >= 1, "prepool must be >= 1"
+        assert postpool >= 0, "postpool must be non-negative"
+
+        self.linear1 = nn.Linear(embed_dim, mlp_out)
+        self.relu = nn.ReLU()
+        self.linear2 = nn.Linear(mlp_out, mlp_out)
+
+        encoder_layer = nn.TransformerEncoderLayer(d_model=mlp_out, nhead=1, batch_first=True)
+        self.transformer1 = nn.TransformerEncoder(encoder_layer, num_layers=prepool, enable_nested_tensor=False)
+        self.transformer2 = nn.TransformerEncoder(encoder_layer, num_layers=postpool, enable_nested_tensor=False) if postpool > 0 else None
+
+        self.pooling = MeanPooling()
+
+    def forward(self, x):
+        """
+        Forward pass of the Transformer layer.
+        
+        Args:
+            x (torch.Tensor): Input tensor of shape (seq_len, batch_size, embed_dim).
+        
+        Returns:
+            torch.Tensor: Output tensor of the same shape as input.
+        """
+
+        x = self.linear1(x)
+        x = self.relu(x)
+        x = self.linear2(x)
+        prepool = [x] # Store pre-pooling representations
+        for layer in self.transformer1.layers:
+            prepool.append(layer(prepool[-1])) 
+
+        x = self.pooling(prepool[-1])  # Apply pooling on the last pre-pooling representation
+
+        if not self.transformer2:
+            return prepool+[x]  # Return all pre-pooling representations and the pooled representation
+        
+        postpool = [x]  # Store post-pooling representations
+        for layer in self.transformer2.layers:
+            postpool.append(layer(postpool[-1]))
+
+        return prepool + postpool  # Return all pre-pooling and post-pooling representations
 
 class UnimodalEncoder(nn.Module):
     """Three-layer encoder for each modality following DeepSER structure"""
