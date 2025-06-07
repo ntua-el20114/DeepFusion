@@ -18,8 +18,8 @@ class DeepLeg(nn.Module):
 
         Instead of:                                 We would probably expect:
         x = self.transformer1(x)                    f = self.transformer1.layers[0](x)
-        f = self.transformer1.layers[0](x)          s = self.transformer1.layers[-1](x)
-        s = self.transformer1.layers[-1](x)         x = self.transformer1(x)
+        f = self.transformer1.layers[0](x)          s = self.transformer1.layers[-1](f)
+        s = self.transformer1.layers[-1](x)         ...
 
         So we might want to create a variation of this encoder that follows the paper description more closely.
 
@@ -70,6 +70,56 @@ class DeepLeg(nn.Module):
         # print(x.shape)
         
         return x, f, s
+
+
+class BaseEnc(nn.Module):
+    def __init__(self, embed_dim, mlp_out, dropout=0.1):
+        """
+        Modified DeepLeg encoder, so that it follows the paper description.
+        Note that this implementation seems to disagree with the paper description.
+
+        Args:
+            embed_dim (int): Dimensionality of input and output embeddings.
+            ff_dim (int): Dimensionality of the feed-forward layer.
+            dropout (float): Dropout rate.
+        """
+        super(DeepLeg, self).__init__()
+
+        self.linear1 = nn.Linear(embed_dim, mlp_out)
+        self.relu = nn.ReLU()
+        self.linear2 = nn.Linear(mlp_out, mlp_out)
+
+        encoder_layer = nn.TransformerEncoderLayer(d_model=mlp_out, nhead=1, batch_first=True)
+        self.transformer1 = nn.TransformerEncoder(encoder_layer, num_layers=2, enable_nested_tensor=False)
+
+        self.transformer2 = nn.TransformerEncoder(encoder_layer, num_layers=1, enable_nested_tensor=False)
+        self.pooling = MeanPooling()
+
+    def forward(self, x):
+        """
+        Forward pass of the Transformer layer.
+        
+        Args:
+            x (torch.Tensor): Input tensor of shape (seq_len, batch_size, embed_dim).
+        
+        Returns:
+            torch.Tensor: Output tensor of the same shape as input.
+        """
+        # import pdb; pdb.set_trace()
+
+        x = self.linear1(x)
+        x = self.relu(x)
+        x = self.linear2(x)
+        
+        # print(x.shape)
+        x = self.transformer1(x)
+
+        f = self.transformer1.layers[0](x)   # h1 <- TransformerLayer(x)
+        s = self.transformer1.layers[-1](f)  # h2 <- TransformerLayer(h1)
+        x = self.pooling(s)                  # h3 <- POOL(h2)
+        
+        return x, f, s
+
 
 class UnimodalEncoder(nn.Module):
     """Three-layer encoder for each modality following DeepSER structure"""

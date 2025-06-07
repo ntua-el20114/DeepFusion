@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 # Import modular components
 from modules.m3 import HardMultimodalMasking
 from modules.gmu import ThreeWayGMU, FourWayGMU, TwoWayGMU  
-from modules.encoders import DeepLeg, UnimodalEncoder, FusionEncoder
+from modules.encoders import DeepLeg, BaseEnc, UnimodalEncoder, FusionEncoder
 from modules.attention import MultiHeadAttention
 from modules.mixup import mixup_features
 
@@ -30,7 +30,7 @@ class DeepSERBase(nn.Module):
 
 
         You can call this model through the MultModel wrapper, using the parameters:
-        
+
         self.model = DeepSERBase(
             embed_dim1=self.orig_d_l,    # Language/text modality input dimension
             mlp_out1=hidden_dim,         # Output dimension for first leg
@@ -50,11 +50,20 @@ class DeepSERBase(nn.Module):
 
         self.mixup = mixup
 
-        self.leg1 = DeepLeg(embed_dim1, mlp_out1)
-        self.leg2 = DeepLeg(embed_dim2, mlp_out2)
-        self.leg3 = DeepLeg(embed_dim3, mlp_out3)
-        self.leg4 = DeepLeg(mlp_out1, mlp_out4)
-        self.leg5 = DeepLeg(mlp_out1, mlp_out4)
+        if encoder == "code":
+            self.leg1 = DeepLeg(embed_dim1, mlp_out1)
+            self.leg2 = DeepLeg(embed_dim2, mlp_out2)
+            self.leg3 = DeepLeg(embed_dim3, mlp_out3)
+            self.leg4 = DeepLeg(mlp_out1, mlp_out4)
+            self.leg5 = DeepLeg(mlp_out1, mlp_out4)
+        elif encoder == "paper":
+            self.leg1 = BaseEnc(embed_dim1, mlp_out1)
+            self.leg2 = BaseEnc(embed_dim2, mlp_out2)
+            self.leg3 = BaseEnc(embed_dim3, mlp_out3)
+            self.leg4 = BaseEnc(mlp_out1, mlp_out4)
+            self.leg5 = BaseEnc(mlp_out1, mlp_out4)
+        else:
+            raise ValueError("Encoder must be 'code' or 'paper'.")
 
         self.linear1 = nn.Linear(mlp_out1 + mlp_out2 + mlp_out3 + mlp_out4, mlp_out4)
         self.relu = nn.ReLU()
