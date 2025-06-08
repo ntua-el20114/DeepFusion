@@ -189,6 +189,7 @@ class VarDepthDeepSER(nn.Module):
             return x, y
 
 
+
 class DeepSERModel(nn.Module):
    """
    Implementation of DeepSER algorithm with GMU fusion at all 3 layers + attention
@@ -324,7 +325,8 @@ class DeepSERModel(nn.Module):
       
        if self.mixup > 0.0 and labels is not None and not dev:
            return yc, yr, labels
-       return yc, yr, self.last_modal_weights
+       return yc, yr
+
 
 
 
