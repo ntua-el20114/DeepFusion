@@ -11,7 +11,7 @@ from modules.mixup import mixup_features
 
 
 class DeepSERBase(nn.Module):
-    def __init__(self, embed_dim1, mlp_out1, embed_dim2, mlp_out2, embed_dim3, mlp_out3, mlp_out4, encoder = "code", dropout=0.1, mixup=0.0):
+    def __init__(self, embed_dim1, mlp_out1, embed_dim2, mlp_out2, embed_dim3, mlp_out3, mlp_out4, encoder = "paper", dropout=0.1, mixup=0.0):
         """
 
         DON'T CHANGE THIS MODEL
@@ -26,7 +26,7 @@ class DeepSERBase(nn.Module):
 
         encoder = "code"/"paper"
         code: use the DeepLeg encoder, like the original repo
-        paper: use a custom encoder that follows the paper description (not yet implemented)
+        paper: use a custom encoder that follows the paper description
 
 
         You can call this model through the MultModel wrapper, using the parameters:
@@ -39,7 +39,7 @@ class DeepSERBase(nn.Module):
             embed_dim3=self.orig_d_v,    # Visual modality input dimension
             mlp_out3=hidden_dim,         # Output dimension for third leg
             mlp_out4=hidden_dim,         # Final output dimension for legs 4&5
-            encoder="code",              # Use original encoder implementation
+            encoder="paper",              
             dropout=dropout,             # Dropout rate
             mixup=mixup                  # Mixup probability
         )
@@ -48,6 +48,8 @@ class DeepSERBase(nn.Module):
 
         super(DeepSERBase, self).__init__()
 
+        print(f"Using DeepSERBase: \n\tembed_dim1={embed_dim1}\n\tmlp_out1={mlp_out1}\n\tembed_dim2={embed_dim2}\n\tmlp_out2={mlp_out2}\n\tembed_dim3={embed_dim3}\n\tmlp_out3={mlp_out3}\n\tmlp_out4={mlp_out4}\n\tencoder={encoder}\n\tdropout={dropout}\n\tmixup={mixup}\n\t")
+        
         self.mixup = mixup
 
         if encoder == "code":
@@ -122,6 +124,9 @@ class VarDepthDeepSER(nn.Module):
 
         super(VarDepthDeepSER, self).__init__()
 
+        print(f"Using VarDepthDeepSER: \n\tembed_dim1={embed_dim1}\n\tmlp_out1={mlp_out1}\n\tembed_dim2={embed_dim2}\n\tmlp_out2={mlp_out2}\n\tembed_dim3={embed_dim3}\n\tmlp_out3={mlp_out3}\n\tmlp_out4={mlp_out4}\n\tprepool={prepool}\n\tpostpool={postpool}\n\tdropout={dropout}\n\tmixup={mixup}\n\t")
+
+
         self.prepool = prepool
         self.postpool = postpool
 
@@ -136,9 +141,12 @@ class VarDepthDeepSER(nn.Module):
         self.leg2 = VarDepthEnc(embed_dim2, mlp_out2, prepool, postpool)
         self.leg3 = VarDepthEnc(embed_dim3, mlp_out3, prepool, postpool)
 
-        self.prepool_fusion = [VarDepthEnc(embed_dim3, mlp_out3, prepool, postpool) for _ in range(prepool)]
-        self.postpool_fusion = [nn.Linear for _ in range(postpool)]
-
+        self.prepool_fusion = [VarDepthEnc(mlp_out1, mlp_out4, prepool, postpool) for _ in range(prepool)]
+        # self.postpool_fusion = [nn.Linear for _ in range(postpool)]
+        self.postpool_fusion = nn.ModuleList([
+            nn.Sequential(nn.Linear(mlp_out1*4, mlp_out1), nn.ReLU()) 
+            for _ in range(postpool)
+        ])
 
     def forward(self, x1, x2, x3, labels=None, dev=False):
         h = self.leg1(x1)
@@ -160,7 +168,8 @@ class VarDepthDeepSER(nn.Module):
                 f = f[self.prepool-1] # keep the last unpooled representation
 
         for i in range(self.postpool):
-            c = torch.cat(h[self.prepool+i], g[self.prepool+i], z[self.prepool+i], f, dim=1)
+            # print(i, self.prepool+i, h[self.prepool+i].shape, f.shape, [h_j.shape for h_j in h])
+            c = torch.cat((h[self.prepool+i], g[self.prepool+i], z[self.prepool+i], f), dim=1)
 
             # pass concatenated vectors through the fusion encoder
             f = self.postpool_fusion[i](c)
@@ -187,7 +196,6 @@ class VarDepthDeepSER(nn.Module):
             return x, y, labels
         else:
             return x, y
-
 
 
 class DeepSERModel(nn.Module):

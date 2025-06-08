@@ -139,8 +139,12 @@ class VarDepthEnc(nn.Module):
         self.linear2 = nn.Linear(mlp_out, mlp_out)
 
         encoder_layer = nn.TransformerEncoderLayer(d_model=mlp_out, nhead=1, batch_first=True)
-        self.transformer1 = nn.TransformerEncoder(encoder_layer, num_layers=prepool, enable_nested_tensor=False)
-        self.transformer2 = nn.TransformerEncoder(encoder_layer, num_layers=postpool, enable_nested_tensor=False) if postpool > 0 else None
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=prepool, enable_nested_tensor=False)
+
+        self.linear_layers = nn.ModuleList([
+            nn.Sequential(nn.Linear(mlp_out, mlp_out), nn.ReLU()) 
+            for _ in range(postpool)
+        ])
 
         self.pooling = MeanPooling()
 
@@ -159,16 +163,17 @@ class VarDepthEnc(nn.Module):
         x = self.relu(x)
         x = self.linear2(x)
         prepool = [x] # Store pre-pooling representations
-        for layer in self.transformer1.layers:
+        for layer in self.transformer.layers:
             prepool.append(layer(prepool[-1])) 
+        prepool.pop(0)  # The first element is the LL output, and we need it only for the loop
 
         x = self.pooling(prepool[-1])  # Apply pooling on the last pre-pooling representation
 
-        if not self.transformer2:
+        if not self.linear_layers:
             return prepool+[x]  # Return all pre-pooling representations and the pooled representation
         
         postpool = [x]  # Store post-pooling representations
-        for layer in self.transformer2.layers:
+        for layer in self.linear_layers:
             postpool.append(layer(postpool[-1]))
 
         return prepool + postpool  # Return all pre-pooling and post-pooling representations
