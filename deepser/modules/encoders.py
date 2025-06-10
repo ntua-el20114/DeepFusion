@@ -1,13 +1,6 @@
-import torch
 from torch import nn
+from enc_modules import *
 
-
-class MeanPooling(nn.Module):
-    def __init__(self):
-        super(MeanPooling, self).__init__()
-    
-    def forward(self, x):
-        return torch.mean(x, dim=1)
 
 
 class DeepLeg(nn.Module):
@@ -141,12 +134,14 @@ class VarDepthEnc(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(d_model=mlp_out, nhead=1, batch_first=True)
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=prepool, enable_nested_tensor=False)
 
-        self.linear_layers = nn.ModuleList([
-            nn.Sequential(nn.Linear(mlp_out, mlp_out), nn.ReLU()) 
-            for _ in range(postpool)
-        ])
-
         self.pooling = MeanPooling()
+        self.pooling = MultiHeadAttentionPooling(mlp_out, num_heads=1)  # Use attention pooling instead of mean pooling
+
+        # self.linear_layers = LinearEncoder(mlp_out, postpool, dropout=dropout)
+        # self.postpool_layers = BottleneckMLP(mlp_out, postpool, factor=2, dropout=dropout)
+        # self.postpool_layers = MultiScaleEncoder(mlp_out, postpool, dropout=dropout)
+        self.postpool_layers = ConvolutionalEncoder(mlp_out, postpool, dropout=dropout)
+
 
     def forward(self, x):
         """
@@ -169,11 +164,11 @@ class VarDepthEnc(nn.Module):
 
         x = self.pooling(prepool[-1])  # Apply pooling on the last pre-pooling representation
 
-        if not self.linear_layers:
+        if not self.postpool_layers:
             return prepool+[x]  # Return all pre-pooling representations and the pooled representation
         
         postpool = [x]  # Store post-pooling representations
-        for layer in self.linear_layers:
+        for layer in self.postpool_layers:
             postpool.append(layer(postpool[-1]))
 
         return prepool + postpool  # Return all pre-pooling and post-pooling representations

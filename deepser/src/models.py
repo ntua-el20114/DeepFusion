@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 # Import modular components
 from modules.m3 import HardMultimodalMasking
 from modules.gmu import ThreeWayGMU, FourWayGMU, TwoWayGMU  
-from modules.encoders import MeanPooling, DeepLeg, BaseEnc, VarDepthEnc, UnimodalEncoder, FusionEncoder
+from modules.encoders import *
 from modules.attention import MultiHeadAttention
 from modules.mixup import mixup_features
 
@@ -137,12 +137,11 @@ class VarDepthDeepSER(nn.Module):
         self.linear2 = nn.Linear(mlp_out4, 8)
         self.linear3 = nn.Linear(mlp_out4, 3)
 
-        self.leg1 = VarDepthEnc(embed_dim1, mlp_out1, prepool, postpool)
-        self.leg2 = VarDepthEnc(embed_dim2, mlp_out2, prepool, postpool)
-        self.leg3 = VarDepthEnc(embed_dim3, mlp_out3, prepool, postpool)
+        self.leg1 = VarDepthEnc(embed_dim1, mlp_out1, prepool, postpool, dropout)
+        self.leg2 = VarDepthEnc(embed_dim2, mlp_out2, prepool, postpool, dropout)
+        self.leg3 = VarDepthEnc(embed_dim3, mlp_out3, prepool, postpool, dropout)
 
         self.prepool_fusion = [VarDepthEnc(mlp_out1, mlp_out4, prepool, postpool) for _ in range(prepool)]
-        # self.postpool_fusion = [nn.Linear for _ in range(postpool)]
         self.postpool_fusion = nn.ModuleList([
             nn.Sequential(nn.Linear(mlp_out1*4, mlp_out1), nn.ReLU()) 
             for _ in range(postpool)
