@@ -1,5 +1,5 @@
 from torch import nn
-from enc_modules import *
+from modules.enc_modules import *
 
 
 
