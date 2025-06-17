@@ -134,8 +134,8 @@ class VarDepthEnc(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(d_model=mlp_out, nhead=1, batch_first=True)
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=prepool, enable_nested_tensor=False)
 
-        self.pooling = MeanPooling()
-        self.pooling = MultiHeadAttentionPooling(mlp_out, num_heads=1)  # Use attention pooling instead of mean pooling
+        #self.pooling = MeanPooling()
+        self.pooling = MultiHeadAttentionPooling(mlp_out, num_heads=8)  # Use attention pooling instead of mean pooling
 
         # self.linear_layers = LinearEncoder(mlp_out, postpool, dropout=dropout)
         # self.postpool_layers = BottleneckMLP(mlp_out, postpool, factor=2, dropout=dropout)
