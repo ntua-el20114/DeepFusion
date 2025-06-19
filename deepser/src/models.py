@@ -363,7 +363,7 @@ class MULTModel(nn.Module):
             embed_dim3=self.orig_d_v,    # Visual modality input dimension
             mlp_out3=hidden_dim,         # Output dimension for third leg
             mlp_out4=hidden_dim,         # Final output dimension for legs 4&5
-            encoder="code",              # Use original encoder implementation
+            encoder="paper",              # Use original encoder implementation
             dropout=dropout,             # Dropout rate
             mixup=mixup                  # Mixup probability
         )
