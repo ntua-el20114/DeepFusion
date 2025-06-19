@@ -147,7 +147,8 @@ def train_model(settings, hyp_params, train_loader, valid_loader, test_loader):
                     text_i, audio_i, vision_i = text_chunks[i], audio_chunks[i], vision_chunks[i]
                     eval_attr_i = eval_attr_chunks[i]
                     preds_i, hiddens_i = net(text_i, audio_i, vision_i, epoch, steps_per_epoch)
-                    
+                    preds_i = preds_i.squeeze(-1)
+
                     if hyp_params.dataset == 'iemocap':
                         preds_i = preds_i.view(-1, 2)
                         eval_attr_i = eval_attr_i.view(-1)
@@ -158,6 +159,7 @@ def train_model(settings, hyp_params, train_loader, valid_loader, test_loader):
                 combined_loss = raw_loss + ctc_loss
             else:
                 preds, hiddens = net(text, audio, vision, epoch, steps_per_epoch)
+                preds = preds.squeeze(-1)
                 if hyp_params.dataset == 'iemocap':
                     preds = preds.view(-1, 2)
                     eval_attr = eval_attr.view(-1)
@@ -216,6 +218,7 @@ def train_model(settings, hyp_params, train_loader, valid_loader, test_loader):
                 
                 net = nn.DataParallel(model) if batch_size > 10 else model
                 preds, _ = net(text, audio, vision)
+                preds = preds.squeeze(-1)
                 if hyp_params.dataset == 'iemocap':
                     preds = preds.view(-1, 2)
                     eval_attr = eval_attr.view(-1)
@@ -263,3 +266,4 @@ def train_model(settings, hyp_params, train_loader, valid_loader, test_loader):
 
     sys.stdout.flush()
     input('[Press Any Key to start another run]')
+
