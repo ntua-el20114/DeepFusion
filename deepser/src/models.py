@@ -197,142 +197,257 @@ class VarDepthDeepSER(nn.Module):
             return x, y
 
 
-class DeepSERModel(nn.Module):
-   """
-   Implementation of DeepSER algorithm with GMU fusion at all 3 layers + attention
-   Following Algorithm 2 structure with enhanced final fusion
-   """
-   def __init__(self, dim_h, dim_g, dim_z, hidden_dim=512, dropout=0.1, mixup=0.0, m3_p=0.5):
-       super(DeepSERModel, self).__init__()
-       self.mixup = mixup
-      
-       # M^3 masking layer
-       self.m3 = HardMultimodalMasking(p=m3_p, n_modalities=3)
-      
-       # Unimodal encoders (ENCh, ENCg, ENCz)
-       self.enc_h = UnimodalEncoder(dim_h, hidden_dim, dropout)
-       self.enc_g = UnimodalEncoder(dim_g, hidden_dim, dropout) 
-       self.enc_z = UnimodalEncoder(dim_z, hidden_dim, dropout)
-      
-       # First fusion layer: f^(1) = ENCf^(1)(h1||g1||z1) using GMU
-       self.fusion_gmu_1 = ThreeWayGMU(hidden_dim, hidden_dim, hidden_dim, hidden_dim, dropout)
-       self.enc_f1 = FusionEncoder(hidden_dim, hidden_dim*2, dropout)
-      
-       # Second fusion layer: f^(2) = ENCf^(2)(h2||g2||z2||f2) using 4-way GMU
-       self.fusion_gmu_2 = FourWayGMU(hidden_dim, hidden_dim, hidden_dim, hidden_dim, hidden_dim, dropout)
-       self.enc_f2 = FusionEncoder(hidden_dim, hidden_dim*2, dropout)
-      
-       # Final fusion with GMU + Attention instead of simple linear transformation
-       self.final_gmu = FourWayGMU(hidden_dim, hidden_dim, hidden_dim, hidden_dim, hidden_dim, dropout)
-       self.final_attention = MultiHeadAttention(hidden_dim, num_heads=8, dropout=dropout)
-       self.final_fusion = nn.Linear(hidden_dim, hidden_dim)  # Final projection after attention
-      
-       # Output layers
-       self.dropout = nn.Dropout(dropout)
-       self.relu = nn.ReLU()
-      
-       self.classifier = nn.Linear(hidden_dim, 8)   # Wc
-       self.regressor = nn.Linear(hidden_dim, 3)    # Wr
-      
-       # Store modal weights and attention weights
-       self.register_buffer("last_modal_weights", torch.tensor([0.33, 0.33, 0.33]))
-       self.register_buffer("last_attention_weights", torch.zeros(1, 8, 4, 4))
+
+class PairwiseVarDepthDeepSER(nn.Module):
+  """
+  Pairwise DeepSER implementation using VarDepthEncoder structure with 3 multimodal flows:
+  - Flow 1: h–g (language–audio)
+  - Flow 2: h–z (language–vision)
+  - Flow 3: g–z (audio–vision)
+   Uses VarDepthEncoder pattern with prepool and postpool layers for each pairwise flow.
+  """
+ def __init__(self, embed_dim1, mlp_out1, embed_dim2, mlp_out2, embed_dim3, mlp_out3,
+               mlp_out4, prepool=2, postpool=0, dropout=0.1, mixup=0.0, m3_p=0.3):
+      """
+      Args:
+          embed_dim1, embed_dim2, embed_dim3: Input dimensions for each modality
+          mlp_out1, mlp_out2, mlp_out3, mlp_out4: Output dimensions
+          prepool: Number of layers before pooling in VarDepthEncoder
+          postpool: Number of layers after pooling in VarDepthEncoder
+          dropout: Dropout rate
+          mixup: Mixup probability
+          m3_p: M3 masking probability
+      """
+      super(PairwiseVarDepthDeepSER, self).__init__()
+    
+      print(f"Using PairwiseVarDepthDeepSER: \n\tembed_dim1={embed_dim1}\n\tmlp_out1={mlp_out1}")
+      print(f"\tembed_dim2={embed_dim2}\n\tmlp_out2={mlp_out2}\n\tembed_dim3={embed_dim3}")
+      print(f"\tmlp_out3={mlp_out3}\n\tmlp_out4={mlp_out4}\n\tprepool={prepool}")
+      print(f"\tpostpool={postpool}\n\tdropout={dropout}\n\tmixup={mixup}\n\tm3_p={m3_p}")
+    
+      self.prepool = prepool
+      self.postpool = postpool
+      self.mixup = mixup
+    
+      # M³ masking layer
+      self.m3 = HardMultimodalMasking(p=m3_p, n_modalities=3)
+    
+      # Unimodal encoders using VarDepthEncoder
+      self.leg1 = VarDepthEnc(embed_dim1, mlp_out1, prepool, postpool, dropout)  # h encoder
+      self.leg2 = VarDepthEnc(embed_dim2, mlp_out2, prepool, postpool, dropout)  # g encoder
+      self.leg3 = VarDepthEnc(embed_dim3, mlp_out3, prepool, postpool, dropout)  # z encoder
+    
+      # === PAIRWISE FLOW 1: h–g (Language–Audio) ===
+      self.hg_prepool_fusion = nn.ModuleList()
+      for i in range(prepool):
+          # first layer: concat h+g (1024+1024)
+          # subsequent layers: concat h+g+prev_repr (1024+1024+1024)
+          in_dim = (mlp_out1 + mlp_out2) if i == 0 else (mlp_out1 + mlp_out2 + mlp_out4)
+          self.hg_prepool_fusion.append(
+              VarDepthEnc(in_dim, mlp_out4, 3, 1, dropout)
+          )
+      self.hg_postpool_fusion = nn.ModuleList([
+          nn.Sequential(
+              nn.Linear(mlp_out1 + mlp_out2 + mlp_out4, mlp_out4),
+              nn.ReLU(),
+              nn.Dropout(dropout)
+          )
+          for _ in range(postpool)
+      ])
+    
+      # === PAIRWISE FLOW 2: h–z (Language–Vision) ===
+      self.hz_prepool_fusion = nn.ModuleList()
+      for i in range(prepool):
+          in_dim = (mlp_out1 + mlp_out3) if i == 0 else (mlp_out1 + mlp_out3 + mlp_out4)
+          self.hz_prepool_fusion.append(
+              VarDepthEnc(in_dim, mlp_out4, 3, 1, dropout)
+          )
+      self.hz_postpool_fusion = nn.ModuleList([
+          nn.Sequential(
+              nn.Linear(mlp_out1 + mlp_out3 + mlp_out4, mlp_out4),
+              nn.ReLU(),
+              nn.Dropout(dropout)
+          )
+          for _ in range(postpool)
+      ])
+    
+      # === PAIRWISE FLOW 3: g–z (Audio–Vision) ===
+      self.gz_prepool_fusion = nn.ModuleList()
+      for i in range(prepool):
+          in_dim = (mlp_out2 + mlp_out3) if i == 0 else (mlp_out2 + mlp_out3 + mlp_out4)
+          self.gz_prepool_fusion.append(
+              VarDepthEnc(in_dim, mlp_out4, 3, 1, dropout)
+          )
 
 
-   def forward(self, x_h, x_g, x_z, labels=None, dev=False):
-       """
-       Forward pass following DeepSER Algorithm 2 exactly
-      
-       Args:
-           x_h: h0 - First modality input
-           x_g: g0 - Second modality input 
-           x_z: z0 - Third modality input
-           labels: Labels for mixup
-           dev: Development/evaluation mode flag
-       """
-       # Apply M^3 masking to inputs
-       x_h, x_g, x_z = self.m3(x_h, x_g, x_z)
-      
-       # Unimodal encodings: [h1, h2, h3] ← ENCh(h0), etc.
-       h1, h2, h3 = self.enc_h(x_h)
-       g1, g2, g3 = self.enc_g(x_g)
-       z1, z2, z3 = self.enc_z(x_z)
-      
-       # First fusion: [_, f2, _] ← ENCf^(1)(h1||g1||z1)
-       # Using GMU instead of concatenation for better fusion
-       batch_size, seq_len, _ = h1.size()
-      
-       # Reshape for sequence-wise GMU processing
-       h1_flat = h1.reshape(-1, h1.size(-1))
-       g1_flat = g1.reshape(-1, g1.size(-1))
-       z1_flat = z1.reshape(-1, z1.size(-1))
-      
-       f1_flat, gates_1 = self.fusion_gmu_1(h1_flat, g1_flat, z1_flat)
-       f1 = f1_flat.reshape(batch_size, seq_len, -1)
-      
-       # Process through fusion encoder to get f2
-       f1_encoded = self.enc_f1(f1)
-       f2 = f1_encoded  # This is our f2 from the algorithm
-      
-       # Second fusion: [_, _, f3] ← ENCf^(2)(h2||g2||z2||f2)
-       # Pool f2 to match h2, g2, z2 dimensions for fusion
-       f2_pooled = f2.mean(dim=1, keepdim=True).expand(-1, seq_len, -1)
-      
-       # Reshape for sequence-wise GMU processing
-       h2_flat = h2.reshape(-1, h2.size(-1))
-       g2_flat = g2.reshape(-1, g2.size(-1))
-       z2_flat = z2.reshape(-1, z2.size(-1))
-       f2_flat = f2_pooled.reshape(-1, f2_pooled.size(-1))
-      
-       f2_fused_flat, gates_2 = self.fusion_gmu_2(h2_flat, g2_flat, z2_flat, f2_flat)
-       f2_fused = f2_fused_flat.reshape(batch_size, seq_len, -1)
-      
-       # Process through second fusion encoder to get f3
-       f2_encoded = self.enc_f2(f2_fused)
-       f3 = f2_encoded.mean(dim=1)  # Pool to get sequence-level representation
-      
-       # Final fusion: Enhanced x ← GMU + Attention(h3||g3||z3||f3)
-       h3_pooled = h3.mean(dim=1)  # Pool sequence dimension
-       g3_pooled = g3.mean(dim=1)
-       z3_pooled = z3.mean(dim=1)
-      
-       # Apply final GMU fusion
-       x_gmu, final_gates = self.final_gmu(h3_pooled, g3_pooled, z3_pooled, f3)
-      
-       # Prepare for attention: stack modality representations
-       # Shape: [batch_size, 4, hidden_dim] for (h3, g3, z3, f3)
-       modal_stack = torch.stack([h3_pooled, g3_pooled, z3_pooled, f3], dim=1)
-      
-       # Apply multi-head attention across modalities
-       attended_modalities, attention_weights = self.final_attention(modal_stack)
-      
-       # Combine GMU output with attention-weighted average
-       attention_fused = attended_modalities.mean(dim=1)  # Average across modalities
-      
-       # Final combination: blend GMU and attention outputs
-       x = 0.0 * x_gmu + 1.0 * attention_fused
-       x = self.final_fusion(x)  # Final projection
-      
-       # Store attention weights for analysis
-       self.last_attention_weights = attention_weights.detach()
-      
-       # MixUp augmentation: x, yc, yr ← MixUp(x, yc, yr)
-       if not dev and labels is not None and torch.rand(1) < self.mixup:
-           x, labels = mixup_features(x, labels)
-      
-       # Final outputs: yc ← Wc(σ(x)), yr ← Wr(σ(x))
-       x_activated = self.relu(x)
-       x_activated = self.dropout(x_activated)
-      
-       yc = self.classifier(x_activated)  # Classification output
-       yr = 1 + 6 * torch.sigmoid(self.regressor(x_activated))  # Regression output
-      
-       # Update modal weights (using final layer gates for comprehensive monitoring)
-       self.last_modal_weights = final_gates.detach().mean(0)[:3]  # First 3 components (h, g, z)
-      
-       if self.mixup > 0.0 and labels is not None and not dev:
-           return yc, yr, labels
-       return yc, yr
+
+
+      self.gz_postpool_fusion = nn.ModuleList([
+          nn.Sequential(
+              nn.Linear(mlp_out2 + mlp_out3 + mlp_out4, mlp_out4),
+              nn.ReLU(),
+              nn.Dropout(dropout)
+          )
+          for _ in range(postpool)
+      ])
+    
+      # === FINAL DECISION FUSION ===
+      # Multi-head attention over the three pairwise flows
+      self.decision_attention = nn.MultiheadAttention(
+          embed_dim=mlp_out4,
+          num_heads=8,
+          dropout=dropout,
+          batch_first=True
+      )
+    
+      # Final projection layers
+      self.final_projection = nn.Sequential(
+          nn.Linear(mlp_out4, mlp_out4),
+          nn.LayerNorm(mlp_out4),
+          nn.ReLU(),
+          nn.Dropout(dropout)
+      )
+    
+      # Output layers
+      self.linear1 = nn.Linear(mlp_out1 + mlp_out2 + mlp_out3 + mlp_out4, mlp_out4)
+      self.relu = nn.ReLU()
+      self.linear2 = nn.Linear(mlp_out4, 8)   # Classification
+      self.linear3 = nn.Linear(mlp_out4, 3)   # Regression
+    
+      # Buffers for analysis
+      self.register_buffer("last_attention_weights", torch.zeros(1, 3, 3))
+      self.register_buffer("last_flow_weights", torch.ones(3) / 3)
+    
+ def forward(self, x1, x2, x3, labels=None, dev=False):
+      """
+      Forward pass with pairwise VarDepth fusion flows
+    
+      Args:
+          x1: Language modality input (h)
+          x2: Audio modality input (g)
+          x3: Vision modality input (z)
+          labels: Labels for mixup
+          dev: Development/evaluation mode flag
+      """
+      # Apply M³ masking
+      x1, x2, x3 = self.m3(x1, x2, x3)
+    
+      # Unimodal encodings: get all intermediate representations
+      h = self.leg1(x1)  # List of representations [h0, h1, ..., h_{prepool+postpool}]
+      g = self.leg2(x2)  # List of representations [g0, g1, ..., g_{prepool+postpool}]
+      z = self.leg3(x3)  # List of representations [z0, z1, ..., z_{prepool+postpool}]
+    
+      # === PAIRWISE FLOW 1: h–g Processing ===
+      hg_fusion_repr = None
+    
+      # Prepool fusion for h-g flow
+      for i in range(self.prepool):
+          if i == 0:
+              hg_concat = torch.cat((h[i], g[i]), dim=-1)
+          else:
+              hg_concat = torch.cat((h[i], g[i], hg_fusion_repr), dim=-1)
+        
+          # Pass through VarDepthEnc fusion layer
+          hg_fusion_outputs = self.hg_prepool_fusion[i](hg_concat)
+        
+          if i == self.prepool - 1:
+              hg_fusion_repr = hg_fusion_outputs[-1]  # Keep the last (pooled) representation
+          else:
+              hg_fusion_repr = hg_fusion_outputs[0]   # Keep the first unpooled representation
+    
+      # Postpool fusion for h-g flow
+      for i in range(self.postpool):
+          hg_concat = torch.cat((h[self.prepool + i], g[self.prepool + i], hg_fusion_repr), dim=1)
+          hg_fusion_repr = self.hg_postpool_fusion[i](hg_concat)
+    
+      # === PAIRWISE FLOW 2: h–z Processing ===
+      hz_fusion_repr = None
+    
+      # Prepool fusion for h-z flow
+      for i in range(self.prepool):
+          if i == 0:
+              hz_concat = torch.cat((h[i], z[i]), dim=-1)
+          else:
+              hz_concat = torch.cat((h[i], z[i], hz_fusion_repr), dim=-1)
+        
+          hz_fusion_outputs = self.hz_prepool_fusion[i](hz_concat)
+        
+          if i == self.prepool - 1:
+              hz_fusion_repr = hz_fusion_outputs[-1]
+          else:
+              hz_fusion_repr = hz_fusion_outputs[0]
+    
+      # Postpool fusion for h-z flow
+      for i in range(self.postpool):
+          hz_concat = torch.cat((h[self.prepool + i], z[self.prepool + i], hz_fusion_repr), dim=1)
+          hz_fusion_repr = self.hz_postpool_fusion[i](hz_concat)
+    
+      # === PAIRWISE FLOW 3: g–z Processing ===
+      gz_fusion_repr = None
+    
+      # Prepool fusion for g-z flow
+      for i in range(self.prepool):
+          if i == 0:
+              gz_concat = torch.cat((g[i], z[i]), dim=-1)
+          else:
+              gz_concat = torch.cat((g[i], z[i], gz_fusion_repr), dim=-1)
+        
+          gz_fusion_outputs = self.gz_prepool_fusion[i](gz_concat)
+        
+          if i == self.prepool - 1:
+              gz_fusion_repr = gz_fusion_outputs[-1]
+          else:
+              gz_fusion_repr = gz_fusion_outputs[0]
+    
+      # Postpool fusion for g-z flow
+      for i in range(self.postpool):
+          gz_concat = torch.cat((g[self.prepool + i], z[self.prepool + i], gz_fusion_repr), dim=1)
+          gz_fusion_repr = self.gz_postpool_fusion[i](gz_concat)
+    
+      # === FINAL DECISION FUSION ===
+      # Stack the three pairwise fusion results
+      pairwise_stack = torch.stack([hg_fusion_repr, hz_fusion_repr, gz_fusion_repr], dim=1)
+      # Shape: (batch_size, 3, mlp_out4)
+    
+      # Apply multi-head attention over the three flows
+      attn_out, attn_weights = self.decision_attention(
+          query=pairwise_stack,
+          key=pairwise_stack,
+          value=pairwise_stack
+      )
+    
+      # Pool across the 3 flow tokens
+      final_fusion = attn_out.mean(dim=1)  # (batch_size, mlp_out4)
+    
+      # Apply final projection
+      final_fusion = self.final_projection(final_fusion)
+    
+      # Concatenate with final unimodal representations (following original DeepSER pattern)
+      x = torch.cat((h[-1], g[-1], z[-1], final_fusion), dim=-1)
+    
+      # Final linear transformation
+      x = self.linear1(x)
+    
+      # Store attention weights
+      self.last_attention_weights = attn_weights.detach()
+    
+      # Mixup augmentation
+      p = torch.rand(size=(1,), device=x.device)
+      if p < self.mixup and labels is not None and not dev:
+          x, labels = mixup_features(x, labels)
+    
+      # Final activation and outputs
+      x = self.relu(x)
+    
+      # Classification and regression outputs
+      yc = self.linear2(x)  # Classification logits
+      yr = 1 + 6 * torch.sigmoid(self.linear3(x))  # Regression outputs
+    
+      if self.mixup > 0.0 and labels is not None and not dev:
+          return yc, yr, labels
+      else:
+          return yc, yr
+
 
 
 
@@ -350,11 +465,13 @@ class MULTModel(nn.Module):
       
        # Model parameters
        hidden_dim = 1024
-       dropout = hyp_params.out_dropout if hasattr(hyp_params, 'out_dropout') else 0.1
+       dropout = 0.4
        mixup = hyp_params.mixup if hasattr(hyp_params, 'mixup') else 0.2
        m3_p = hyp_params.m3_p if hasattr(hyp_params, 'm3_p') else 0.4
       
-       # Initialize DeepSER model
+       # Uncomment the model you want to use (Deepser base or pairwise)
+       # If you want to use Vardepth model check the parameters and initialize it like the others
+       """
        self.model = DeepSERBase(
             embed_dim1=self.orig_d_l,    # Language/text modality input dimension
             mlp_out1=hidden_dim,         # Output dimension for first leg
@@ -367,7 +484,24 @@ class MULTModel(nn.Module):
             dropout=dropout,             # Dropout rate
             mixup=mixup                  # Mixup probability
         )
+        """
 
+
+        self.model = PairwiseVarDepthDeepSER(
+          embed_dim1=self.orig_d_l,    # Language/text modality input dimension
+          mlp_out1=hidden_dim,         # Output dimension for first modality
+          embed_dim2=self.orig_d_a,    # Audio modality input dimension
+          mlp_out2=hidden_dim,         # Output dimension for second modality
+          embed_dim3=self.orig_d_v,    # Visual modality input dimension
+          mlp_out3=hidden_dim,         # Output dimension for third modality
+          mlp_out4=hidden_dim,         # Final output dimension
+          prepool=4,             # Layers before pooling
+          postpool=4,           # Layers after pooling
+          dropout=dropout,             # Dropout rate
+          mixup=mixup,                 # Mixup probability
+          m3_p=m3_p                    # M3 masking probability
+      )
+       
        # Output dimension compatibility
        self.output_dim = hyp_params.output_dim
        if self.output_dim != 8:
