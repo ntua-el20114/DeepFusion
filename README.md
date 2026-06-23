@@ -1,4 +1,4 @@
-# DeepFusion: Pairwise VarDepth DeepSER
+# DeepFusion: A Dive Into the MEDUSA Framework and its DeepSER Architecture.
 
 **NTUA Speech and Language Processing (SLP) 2025 – Semester Project**
 
