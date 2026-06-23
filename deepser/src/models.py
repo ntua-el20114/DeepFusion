@@ -8,6 +8,7 @@ from modules.gmu import ThreeWayGMU, FourWayGMU, TwoWayGMU
 from modules.encoders import *
 from modules.attention import MultiHeadAttention
 from modules.mixup import mixup_features
+from modules.enc_modules import MeanPooling, MultiHeadAttentionPooling, ConvolutionalEncoder
 
 
 class DeepSERBase(nn.Module):
@@ -198,6 +199,84 @@ class VarDepthDeepSER(nn.Module):
 
 
 
+class VarDepthSimpleFusion(nn.Module):
+    def __init__(self, embed_dim1, mlp_out1, embed_dim2, mlp_out2, embed_dim3, mlp_out3, mlp_out4, prepool=2, postpool=0, dropout=0.1, mixup=0.0):
+        """
+        Like VarDepthDeepSER, but at the fusion stage only a transformer/pooling/ff layer is used
+        """
+
+        super(VarDepthSimpleFusion, self).__init__()
+
+        print(f"Using VarDepthSimpleFusion: \n\tembed_dim1={embed_dim1}\n\tmlp_out1={mlp_out1}\n\tembed_dim2={embed_dim2}\n\tmlp_out2={mlp_out2}\n\tembed_dim3={embed_dim3}\n\tmlp_out3={mlp_out3}\n\tmlp_out4={mlp_out4}\n\tprepool={prepool}\n\tpostpool={postpool}\n\tdropout={dropout}\n\tmixup={mixup}\n\t")
+
+
+        self.prepool = prepool
+        self.postpool = postpool
+
+        self.mixup = mixup
+
+        self.linear1 = nn.Linear(mlp_out1 + mlp_out2 + mlp_out3 + mlp_out4, mlp_out4)
+        self.relu = nn.ReLU()
+        self.linear2 = nn.Linear(mlp_out4, 8)
+        self.linear3 = nn.Linear(mlp_out4, 3)
+
+        self.leg1 = VarDepthEnc(embed_dim1, mlp_out1, prepool, postpool, dropout)
+        self.leg2 = VarDepthEnc(embed_dim2, mlp_out2, prepool, postpool, dropout)
+        self.leg3 = VarDepthEnc(embed_dim3, mlp_out3, prepool, postpool, dropout)
+
+        self.prepool_fusion = [VarDepthEnc(mlp_out1, mlp_out4, prepool, postpool) for _ in range(prepool)]
+        self.pool_fusion = MultiHeadAttentionPooling(mlp_out1, num_heads=8)
+        self.postpool_fusion = [ConvolutionalEncoder(mlp_out1, postpool, dropout=dropout) for _ in range(postpool)]
+
+    def forward(self, x1, x2, x3, labels=None, dev=False):
+        h = self.leg1(x1)
+        g = self.leg2(x2)
+        z = self.leg3(x3)
+
+        for i in range(self.prepool):
+            if i==0:
+                c = torch.cat((h[i], g[i], z[i]), dim=1)
+            else:
+                c = torch.cat((h[i], g[i], z[i], f), dim=1) # concat with previous fusion output
+
+            if i == self.prepool-1:
+                # use pooling for the last prepool layer
+                f = self.pool_fusion(c)  
+            else:
+                # pass concatenated vectors through the fusion encoder
+                f = self.prepool_fusion[i](c)
+
+        for i in range(self.postpool):
+            # print(i, self.prepool+i, h[self.prepool+i].shape, f.shape, [h_j.shape for h_j in h])
+            c = torch.cat((h[self.prepool+i], g[self.prepool+i], z[self.prepool+i], f), dim=1)
+
+            # pass concatenated vectors through the fusion encoder
+            f = self.postpool_fusion[i](c)
+
+        # Concatenate the outputs of the three legs and the final fusion output
+        x = torch.cat((h[-1], g[-1], z[-1], f), dim=-1)
+
+        # Continue with the original DeepSER forward pass
+        x = self.linear1(x)
+
+        p = torch.rand(size=(1,), device=x.device)
+
+        if p < self.mixup and labels is not None and not dev:
+            x, labels = mixup_features(x, labels)
+
+        x = self.relu(x)
+        y = self.linear3(x)
+
+        x = self.linear2(x)
+        y = 1 + 6*torch.sigmoid(y)
+        # x = self.softmax(x)
+        
+        if self.mixup > 0.0 and labels is not None and not dev:
+            return x, y, labels
+        else:
+            return x, y
+
+
 class PairwiseVarDepthDeepSER(nn.Module):
   """
   Pairwise DeepSER implementation using VarDepthEncoder structure with 3 multimodal flows:
@@ -206,7 +285,7 @@ class PairwiseVarDepthDeepSER(nn.Module):
   - Flow 3: g–z (audio–vision)
    Uses VarDepthEncoder pattern with prepool and postpool layers for each pairwise flow.
   """
- def __init__(self, embed_dim1, mlp_out1, embed_dim2, mlp_out2, embed_dim3, mlp_out3,
+  def __init__(self, embed_dim1, mlp_out1, embed_dim2, mlp_out2, embed_dim3, mlp_out3,
                mlp_out4, prepool=2, postpool=0, dropout=0.1, mixup=0.0, m3_p=0.3):
       """
       Args:
@@ -318,7 +397,7 @@ class PairwiseVarDepthDeepSER(nn.Module):
       self.register_buffer("last_attention_weights", torch.zeros(1, 3, 3))
       self.register_buffer("last_flow_weights", torch.ones(3) / 3)
     
- def forward(self, x1, x2, x3, labels=None, dev=False):
+  def forward(self, x1, x2, x3, labels=None, dev=False):
       """
       Forward pass with pairwise VarDepth fusion flows
     
@@ -454,39 +533,38 @@ class PairwiseVarDepthDeepSER(nn.Module):
 
 
 class MULTModel(nn.Module):
-   """
-   Wrapper around DeepSERModel to maintain interface compatibility
-   """
-   def __init__(self, hyp_params):
-       super(MULTModel, self).__init__()
+    """
+    Wrapper around DeepSERModel to maintain interface compatibility
+    """
+    def __init__(self, hyp_params):
+        super(MULTModel, self).__init__()
       
-       # Store original dimensions
-       self.orig_d_l, self.orig_d_a, self.orig_d_v = hyp_params.orig_d_l, hyp_params.orig_d_a, hyp_params.orig_d_v
+        # Store original dimensions
+        self.orig_d_l, self.orig_d_a, self.orig_d_v = hyp_params.orig_d_l, hyp_params.orig_d_a, hyp_params.orig_d_v
+
+        # Model parameters
+        hidden_dim = 1024
+        dropout = 0.4
+        mixup = hyp_params.mixup if hasattr(hyp_params, 'mixup') else 0.2
+        m3_p = hyp_params.m3_p if hasattr(hyp_params, 'm3_p') else 0.4
       
-       # Model parameters
-       hidden_dim = 1024
-       dropout = 0.4
-       mixup = hyp_params.mixup if hasattr(hyp_params, 'mixup') else 0.2
-       m3_p = hyp_params.m3_p if hasattr(hyp_params, 'm3_p') else 0.4
-      
-       # Uncomment the model you want to use (Deepser base or pairwise)
-       # If you want to use Vardepth model check the parameters and initialize it like the others
-       """
-       self.model = DeepSERBase(
-            embed_dim1=self.orig_d_l,    # Language/text modality input dimension
-            mlp_out1=hidden_dim,         # Output dimension for first leg
-            embed_dim2=self.orig_d_a,    # Audio modality input dimension  
-            mlp_out2=hidden_dim,         # Output dimension for second leg
-            embed_dim3=self.orig_d_v,    # Visual modality input dimension
-            mlp_out3=hidden_dim,         # Output dimension for third leg
-            mlp_out4=hidden_dim,         # Final output dimension for legs 4&5
-            encoder="paper",              # Use original encoder implementation
-            dropout=dropout,             # Dropout rate
-            mixup=mixup                  # Mixup probability
-        )
+        # Uncomment the model you want to use (Deepser base or pairwise)
+        # If you want to use Vardepth model check the parameters and initialize it like the others
         """
-
-
+        self.model = DeepSERBase(
+             embed_dim1=self.orig_d_l,    # Language/text modality input dimension
+             mlp_out1=hidden_dim,         # Output dimension for first leg
+             embed_dim2=self.orig_d_a,    # Audio modality input dimension  
+             mlp_out2=hidden_dim,         # Output dimension for second leg
+             embed_dim3=self.orig_d_v,    # Visual modality input dimension
+             mlp_out3=hidden_dim,         # Output dimension for third leg
+             mlp_out4=hidden_dim,         # Final output dimension for legs 4&5
+             encoder="paper",              # Use original encoder implementation
+             dropout=dropout,             # Dropout rate
+             mixup=mixup                  # Mixup probability
+         )
+         """
+            
         self.model = PairwiseVarDepthDeepSER(
           embed_dim1=self.orig_d_l,    # Language/text modality input dimension
           mlp_out1=hidden_dim,         # Output dimension for first modality
@@ -502,21 +580,21 @@ class MULTModel(nn.Module):
           m3_p=m3_p                    # M3 masking probability
       )
        
-       # Output dimension compatibility
-       self.output_dim = hyp_params.output_dim
-       if self.output_dim != 8:
-           self.output_layer = nn.Linear(8, self.output_dim)
+        # Output dimension compatibility
+        self.output_dim = hyp_params.output_dim
+        if self.output_dim != 8:
+            self.output_layer = nn.Linear(8, self.output_dim)
       
-       # Compatibility attributes
-       self.vonly = hyp_params.vonly if hasattr(hyp_params, 'vonly') else False
-       self.aonly = hyp_params.aonly if hasattr(hyp_params, 'aonly') else False
-       self.lonly = hyp_params.lonly if hasattr(hyp_params, 'lonly') else False
+        # Compatibility attributes
+        self.vonly = hyp_params.vonly if hasattr(hyp_params, 'vonly') else False
+        self.aonly = hyp_params.aonly if hasattr(hyp_params, 'aonly') else False
+        self.lonly = hyp_params.lonly if hasattr(hyp_params, 'lonly') else False
       
-       self.register_buffer("last_modal_weights", torch.tensor([0.33, 0.33, 0.33]))
-       self.register_buffer("last_attention_weights", torch.zeros(1, 8, 4, 4))
+        self.register_buffer("last_modal_weights", torch.tensor([0.33, 0.33, 0.33]))
+        self.register_buffer("last_attention_weights", torch.zeros(1, 8, 4, 4))
 
 
-   def forward(self, x_l, x_a, x_v, epoch=None, steps_per_epoch=None, labels=None, dev=False):
+    def forward(self, x_l, x_a, x_v, epoch=None, steps_per_epoch=None, labels=None, dev=False):
        """
        Forward pass maintaining original interface
        Maps inputs to h, g, z as per DeepSER naming convention

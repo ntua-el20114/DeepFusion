@@ -252,6 +252,7 @@ def train_model(settings, hyp_params, train_loader, valid_loader, test_loader):
         if val_loss < best_valid:
             print(f"Saved model at pre_trained_models/{hyp_params.name}.pt!")
             save_model(hyp_params, model, name=hyp_params.name)
+            model.save_encoder_weights("pretrained/leg1.pt")
             best_valid = val_loss
 
     model = load_model(hyp_params, name=hyp_params.name)

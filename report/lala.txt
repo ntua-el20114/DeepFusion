@@ -1,0 +1,181 @@
+%!TEX program = xelatex
+\documentclass[10pt]{article}
+
+% Packages for XeLaTeX
+\usepackage{fontspec} % For custom fonts and Unicode support
+\usepackage{multicol} % For two-column layout
+\usepackage{amsmath} % For mathematical equations
+\usepackage{graphicx} % For including figures
+\usepackage{lipsum} % For placeholder text (remove in your actual document)
+\usepackage{geometry} % To adjust margins and padding
+\usepackage{authblk} % For author affiliations
+\usepackage{booktabs} % For better table formatting
+\usepackage{appendix} % For appendices
+\usepackage{placeins} % For controlling figure placement
+\usepackage{float} % For better control of figure and table placement
+\usepackage{multirow}
+\usepackage{bbm}
+\usepackage{biblatex} % For bibliography management
+\usepackage{array} % Required for tabularx
+\usepackage{tabularx}
+
+% Set main font (optional, replace with your preferred font)
+\setmainfont{Linux Libertine}
+
+% Title, Author, and Date
+\title{\textbf{DeepFusion: A dive into the MEDUSA framework and its DeepSER architecture}}
+\author{
+    \centering
+    \begin{minipage}{0.24\linewidth}
+        \centering
+        \textbf{Karali Alexandra} \\ 03121084
+    \end{minipage}
+    \begin{minipage}{0.24\linewidth}
+        \centering
+        \textbf{Karatzanos Dimitrios} \\ 03121083
+    \end{minipage}
+    \begin{minipage}{0.24\linewidth}
+        \centering
+        \textbf{Pliatsika Magdalini} \\ 03121220
+    \end{minipage}
+    \begin{minipage}{0.24\linewidth}
+        \centering
+        \textbf{Raftopoulos Michail} \\ 03120114
+    \end{minipage}
+}
+\affil{Supervisors: Georgiou Efthymios, Potamianos Alexandros}
+\affil{School of ECE, National Technical University of Athens}
+
+% \addbibresource{references.bib}
+
+% Adjust page geometry (reduce margins)
+\geometry{
+    a4paper, % Paper size
+    left=20mm, % Left margin
+    right=20mm, % Right margin
+    top=30mm, % Top margin
+    bottom=30mm, % Bottom margin
+    columnsep=8mm % Space between columns
+}
+
+\begin{document}
+
+% Title and Abstract
+\maketitle
+\begin{abstract}
+    Multimodal sentiment analysis faces fundamental challenges in effectively modeling interactions between heterogeneous modalities (text, audio, and vision) each with distinct statistical properties, temporal dynamics, and varying levels of noise. We introduce Pairwise VarDepth DeepSER, a novel architecture that addresses cross-modal fusion through explicit pairwise modeling, processing text-audio, audio-vision, and vision-text interactions independently before final integration. Our variable-depth encoders strategically combine Transformer layers with convolutional kernels to capture both sequential dependencies and local patterns efficiently. The framework incorporates modality-specific pretraining strategies and employs ensemble learning through meta-classifier stacking and model-soup weight averaging for enhanced robustness. Extensive evaluation on CMU-MOSEI demonstrates consistent improvements of ~1\% across all classification tasks (binary, 5-class, 7-class) compared to the baseline DeepSER, while achieving metrics comparable to the state of the art. The pairwise fusion strategy proves particularly effective for capturing fine-grained cross-modal dependencies in sentiment recognition.
+\end{abstract}
+
+% Two-column content starts here
+\begin{multicols}{2}
+
+\section{Introduction}
+
+
+
+\section{Related Work}
+
+
+
+
+\section{Method}
+\subsection{Architecture}
+
+
+\subsubsection{Variable Depth}
+
+
+
+\subsubsection{Attention Pooling}
+
+
+\subsubsection{Pairwise Fusion}
+
+
+
+
+
+
+\subsection{Training Strategy}
+
+
+\subsubsection{Encoders Pretraining}
+
+
+
+
+
+
+
+\begin{itemize}
+    \item Frozen Initialization: Pretrained encoder weights were loaded and then frozen during multimodal training.
+    \item Trainable Initialization: Pretrained weights were used to initialize the encoders, but all parameters remained trainable during downstream training. This allows the model to adapt to cross-modal interactions.
+\end{itemize}
+
+
+\subsubsection{Meta-Classifier and Model Soup}
+
+
+
+
+
+\section{Setup}
+\subsection{Dataset}
+
+
+\subsection{Features}
+
+\begin{itemize}
+    \item Textual features: 768-dimensional BERT embeddings from the pretrained bert-base-uncased model, obtained by averaging the last four hidden layers for each utterance.
+    \item Acoustic features: 74-dimensional vectors from COVAREP, including MFCCs, pitch, and glottal parameters.
+    \item Visual features: 35-dimensional facial action units and landmark measurements from FACET.
+\end{itemize}
+
+\subsection{Evaluation Metrics}
+To assess both regression and classification performance, we report:
+\begin{itemize}
+    \item Mean Absolute Error (MAE): Mean absolute difference between predicted and ground-truth sentiment scores.
+    \item Correlation Coefficient (CorrCoef): Linear correlation between predictions and labels.
+    \item 5-class and 7-class Accuracy (acc5, acc7): Accuracy after discretizing continuous predictions into 5 or 7 equally spaced bins.
+    \item Binary Accuracy (acc): Accuracy when classifying sentiment as negative (score < 0) vs. non-negative (score ≥ 0).
+    \item F1 Score (f1): Harmonic mean of precision and recall for the binary task.
+\end{itemize}
+
+\subsection{Experimental Approach}
+
+
+\section{Results}
+\subsection{Architectural Experiments}
+
+
+
+\subsection{Training Strategy}
+
+
+
+\begin{itemize}
+    \item The MOSEI dataset already provides relatively rich multimodal alignment and supervision.
+    \item Our fusion architecture is powerful enough to learn useful representations from scratch.
+    \item The downstream task may not benefit strongly from unimodal improvements, especially if inter-modal attention compensates for weak encodings.
+\end{itemize}
+
+
+\begin{itemize}
+    \item Accuracy and F1 improved across the board.
+    \item MAE was consistently reduced, indicating more precise continuous predictions.
+    \item Correlation Coefficient increased, suggesting the model better captured the structure of human sentiment ratings.
+    \item Slight drops in acc5 and acc7 were observed, likely due to finer-grained error corrections not captured by coarse multiclass thresholds.
+\end{itemize}
+
+
+\section{Conclusions \& Future Work}
+
+
+
+
+
+% \printbibliography
+
+\end{multicols}
+
+\end{document}

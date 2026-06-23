@@ -1,0 +1,339 @@
+% $ biblatex auxiliary file $
+% $ biblatex bbl format version 3.3 $
+% Do not modify the above lines!
+%
+% This is an auxiliary file used by the 'biblatex' package.
+% This file may safely be deleted. It will be recreated by
+% biber as required.
+%
+\begingroup
+\makeatletter
+\@ifundefined{ver@biblatex.sty}
+  {\@latex@error
+     {Missing 'biblatex' package}
+     {The bibliography requires the 'biblatex' package.}
+      \aftergroup\endinput}
+  {}
+\endgroup
+
+
+\refsection{0}
+  \datalist[entry]{nty/global//global/global/global}
+    \entry{DHF}{inproceedings}{}{}
+      \name{author}{3}{}{%
+        {{hash=323142ab56ff6cb7349e053dfca98923}{%
+           family={Georgiou},
+           familyi={G\bibinitperiod},
+           given={Efthymios},
+           giveni={E\bibinitperiod}}}%
+        {{hash=d25f00ae02e0a5f184722173ce47d89d}{%
+           family={Papaioannou},
+           familyi={P\bibinitperiod},
+           given={Charilaos},
+           giveni={C\bibinitperiod}}}%
+        {{hash=2eb58cecf753a66a5aa5c394edd43442}{%
+           family={Potamianos},
+           familyi={P\bibinitperiod},
+           given={Alexandros},
+           giveni={A\bibinitperiod}}}%
+      }
+      \strng{namehash}{a60d1248394a43fe7d74606ac9f8cd65}
+      \strng{fullhash}{a60d1248394a43fe7d74606ac9f8cd65}
+      \strng{fullhashraw}{a60d1248394a43fe7d74606ac9f8cd65}
+      \strng{bibnamehash}{a60d1248394a43fe7d74606ac9f8cd65}
+      \strng{authorbibnamehash}{a60d1248394a43fe7d74606ac9f8cd65}
+      \strng{authornamehash}{a60d1248394a43fe7d74606ac9f8cd65}
+      \strng{authorfullhash}{a60d1248394a43fe7d74606ac9f8cd65}
+      \strng{authorfullhashraw}{a60d1248394a43fe7d74606ac9f8cd65}
+      \field{sortinit}{G}
+      \field{sortinithash}{32d67eca0634bf53703493fb1090a2e8}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{booktitle}{Interspeech 2019}
+      \field{issn}{2958-1796}
+      \field{title}{Deep Hierarchical Fusion with Application in Sentiment Analysis}
+      \field{year}{2019}
+      \field{pages}{1646\bibrangedash 1650}
+      \range{pages}{5}
+      \verb{doi}
+      \verb 10.21437/Interspeech.2019-3243
+      \endverb
+    \endentry
+    \entry{m3}{inproceedings}{}{}
+      \name{author}{3}{}{%
+        {{hash=323142ab56ff6cb7349e053dfca98923}{%
+           family={Georgiou},
+           familyi={G\bibinitperiod},
+           given={Efthymios},
+           giveni={E\bibinitperiod}}}%
+        {{hash=5a60526edbcf1e422bdd317fef9be1ba}{%
+           family={Paraskevopoulos},
+           familyi={P\bibinitperiod},
+           given={Georgios},
+           giveni={G\bibinitperiod}}}%
+        {{hash=2eb58cecf753a66a5aa5c394edd43442}{%
+           family={Potamianos},
+           familyi={P\bibinitperiod},
+           given={Alexandros},
+           giveni={A\bibinitperiod}}}%
+      }
+      \strng{namehash}{147e3ef61230d7fe7815a277949dc196}
+      \strng{fullhash}{147e3ef61230d7fe7815a277949dc196}
+      \strng{fullhashraw}{147e3ef61230d7fe7815a277949dc196}
+      \strng{bibnamehash}{147e3ef61230d7fe7815a277949dc196}
+      \strng{authorbibnamehash}{147e3ef61230d7fe7815a277949dc196}
+      \strng{authornamehash}{147e3ef61230d7fe7815a277949dc196}
+      \strng{authorfullhash}{147e3ef61230d7fe7815a277949dc196}
+      \strng{authorfullhashraw}{147e3ef61230d7fe7815a277949dc196}
+      \field{sortinit}{G}
+      \field{sortinithash}{32d67eca0634bf53703493fb1090a2e8}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{month}{08}
+      \field{title}{M3: MultiModal Masking Applied to Sentiment Analysis}
+      \field{year}{2021}
+      \field{pages}{2876\bibrangedash 2880}
+      \range{pages}{5}
+      \verb{doi}
+      \verb 10.21437/Interspeech.2021-1739
+      \endverb
+    \endentry
+    \entry{medusa}{misc}{}{}
+      \name{author}{1}{}{%
+        {{hash=a0ac96601b1ac8915f702229d8a1fcc4}{%
+           family={Interspeech\bibnamedelima 2025},
+           familyi={I\bibinitperiod\bibinitdelim 2\bibinitperiod},
+           given={Anonymous},
+           giveni={A\bibinitperiod},
+           prefix={submission\bibnamedelima to},
+           prefixi={s\bibinitperiod\bibinitdelim t\bibinitperiod}}}%
+      }
+      \strng{namehash}{a0ac96601b1ac8915f702229d8a1fcc4}
+      \strng{fullhash}{a0ac96601b1ac8915f702229d8a1fcc4}
+      \strng{fullhashraw}{a0ac96601b1ac8915f702229d8a1fcc4}
+      \strng{bibnamehash}{a0ac96601b1ac8915f702229d8a1fcc4}
+      \strng{authorbibnamehash}{a0ac96601b1ac8915f702229d8a1fcc4}
+      \strng{authornamehash}{a0ac96601b1ac8915f702229d8a1fcc4}
+      \strng{authorfullhash}{a0ac96601b1ac8915f702229d8a1fcc4}
+      \strng{authorfullhashraw}{a0ac96601b1ac8915f702229d8a1fcc4}
+      \field{sortinit}{I}
+      \field{sortinithash}{8d291c51ee89b6cd86bf5379f0b151d8}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{note}{(Unpublished paper submission)}
+      \field{title}{M EDUSA : A Multimodal Deep Fusion Multi-Stage Training Framework for Speech Emotion Recognition in Naturalistic Conditions}
+    \endentry
+    \entry{mulT}{inproceedings}{}{}
+      \name{author}{6}{}{%
+        {{hash=f9e97a0bc44d64b5d4fc88fedad3d436}{%
+           family={Tsai},
+           familyi={T\bibinitperiod},
+           given={Yao-Hung\bibnamedelima Hubert},
+           giveni={Y\bibinithyphendelim H\bibinitperiod\bibinitdelim H\bibinitperiod}}}%
+        {{hash=46866596e404b7745d45fdb1cbff0a01}{%
+           family={Bai},
+           familyi={B\bibinitperiod},
+           given={Shaojie},
+           giveni={S\bibinitperiod}}}%
+        {{hash=06677461a89662ad7aef6cb0efdb2195}{%
+           family={Liang},
+           familyi={L\bibinitperiod},
+           given={Paul\bibnamedelima Pu},
+           giveni={P\bibinitperiod\bibinitdelim P\bibinitperiod}}}%
+        {{hash=0288715a83a3349e44f9292c5c2149f7}{%
+           family={Kolter},
+           familyi={K\bibinitperiod},
+           given={J.\bibnamedelimi Zico},
+           giveni={J\bibinitperiod\bibinitdelim Z\bibinitperiod}}}%
+        {{hash=2b23af9d24a98a5912d3b7c941b08ed7}{%
+           family={Morency},
+           familyi={M\bibinitperiod},
+           given={Louis-Philippe},
+           giveni={L\bibinithyphendelim P\bibinitperiod}}}%
+        {{hash=bd2be300d445e9f6db7808f9533e66cb}{%
+           family={Salakhutdinov},
+           familyi={S\bibinitperiod},
+           given={Ruslan},
+           giveni={R\bibinitperiod}}}%
+      }
+      \list{location}{1}{%
+        {Florence, Italy}%
+      }
+      \list{publisher}{1}{%
+        {Association for Computational Linguistics}%
+      }
+      \strng{namehash}{6dbc8696590356766f637d0043bccac6}
+      \strng{fullhash}{84cfa657fc23401bad1b74eab28872b6}
+      \strng{fullhashraw}{84cfa657fc23401bad1b74eab28872b6}
+      \strng{bibnamehash}{6dbc8696590356766f637d0043bccac6}
+      \strng{authorbibnamehash}{6dbc8696590356766f637d0043bccac6}
+      \strng{authornamehash}{6dbc8696590356766f637d0043bccac6}
+      \strng{authorfullhash}{84cfa657fc23401bad1b74eab28872b6}
+      \strng{authorfullhashraw}{84cfa657fc23401bad1b74eab28872b6}
+      \field{sortinit}{T}
+      \field{sortinithash}{9af77f0292593c26bde9a56e688eaee9}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{booktitle}{Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}
+      \field{month}{7}
+      \field{title}{Multimodal Transformer for Unaligned Multimodal Language Sequences}
+      \field{year}{2019}
+    \endentry
+    \entry{manifold-mixup}{misc}{}{}
+      \name{author}{8}{}{%
+        {{hash=1f6f02dafe2e94fe983f99ca4ec63c99}{%
+           family={Verma},
+           familyi={V\bibinitperiod},
+           given={Vikas},
+           giveni={V\bibinitperiod}}}%
+        {{hash=ef69d4db3429fa2ccff2c8ab6d0ff113}{%
+           family={Lamb},
+           familyi={L\bibinitperiod},
+           given={Alex},
+           giveni={A\bibinitperiod}}}%
+        {{hash=d96fd3ba171f97c8e3e7b5448f18361f}{%
+           family={Beckham},
+           familyi={B\bibinitperiod},
+           given={Christopher},
+           giveni={C\bibinitperiod}}}%
+        {{hash=72aae379e14075ea794cdf43b993d1af}{%
+           family={Najafi},
+           familyi={N\bibinitperiod},
+           given={Amir},
+           giveni={A\bibinitperiod}}}%
+        {{hash=e7fbb560b8f6fd4003bc50b9316b1821}{%
+           family={Mitliagkas},
+           familyi={M\bibinitperiod},
+           given={Ioannis},
+           giveni={I\bibinitperiod}}}%
+        {{hash=ccec1ccd2e1aa86960eb2e872c6b7020}{%
+           family={Courville},
+           familyi={C\bibinitperiod},
+           given={Aaron},
+           giveni={A\bibinitperiod}}}%
+        {{hash=47d681c0cbae75196012a538c46ccc06}{%
+           family={Lopez-Paz},
+           familyi={L\bibinithyphendelim P\bibinitperiod},
+           given={David},
+           giveni={D\bibinitperiod}}}%
+        {{hash=40a8e4774982146adc2688546f54efb2}{%
+           family={Bengio},
+           familyi={B\bibinitperiod},
+           given={Yoshua},
+           giveni={Y\bibinitperiod}}}%
+      }
+      \strng{namehash}{97a9a175ae2d679a9d76a265953e389b}
+      \strng{fullhash}{852e39177780fff5ea048eeb0d09f21e}
+      \strng{fullhashraw}{852e39177780fff5ea048eeb0d09f21e}
+      \strng{bibnamehash}{97a9a175ae2d679a9d76a265953e389b}
+      \strng{authorbibnamehash}{97a9a175ae2d679a9d76a265953e389b}
+      \strng{authornamehash}{97a9a175ae2d679a9d76a265953e389b}
+      \strng{authorfullhash}{852e39177780fff5ea048eeb0d09f21e}
+      \strng{authorfullhashraw}{852e39177780fff5ea048eeb0d09f21e}
+      \field{sortinit}{V}
+      \field{sortinithash}{afb52128e5b4dc4b843768c0113d673b}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{eprintclass}{stat.ML}
+      \field{eprinttype}{arXiv}
+      \field{title}{Manifold Mixup: Better Representations by Interpolating Hidden States}
+      \field{year}{2019}
+      \verb{eprint}
+      \verb 1806.05236
+      \endverb
+      \verb{urlraw}
+      \verb https://arxiv.org/abs/1806.05236
+      \endverb
+      \verb{url}
+      \verb https://arxiv.org/abs/1806.05236
+      \endverb
+    \endentry
+    \entry{modelsoup}{misc}{}{}
+      \name{author}{11}{}{%
+        {{hash=19463711d20e6ca18c22c22f4c861e6a}{%
+           family={Wortsman},
+           familyi={W\bibinitperiod},
+           given={Mitchell},
+           giveni={M\bibinitperiod}}}%
+        {{hash=fcee556785f43a2caed6de7b87c02322}{%
+           family={Ilharco},
+           familyi={I\bibinitperiod},
+           given={Gabriel},
+           giveni={G\bibinitperiod}}}%
+        {{hash=afdbcaa18d3bab978dcc96bfb9ff91f8}{%
+           family={Gadre},
+           familyi={G\bibinitperiod},
+           given={Samir\bibnamedelima Yitzhak},
+           giveni={S\bibinitperiod\bibinitdelim Y\bibinitperiod}}}%
+        {{hash=a38e53f2691eb44e52e78c8e72de65a7}{%
+           family={Roelofs},
+           familyi={R\bibinitperiod},
+           given={Rebecca},
+           giveni={R\bibinitperiod}}}%
+        {{hash=5e565bbbe9e5a2184d31058b0dc24c14}{%
+           family={Gontijo-Lopes},
+           familyi={G\bibinithyphendelim L\bibinitperiod},
+           given={Raphael},
+           giveni={R\bibinitperiod}}}%
+        {{hash=432e0479d5af4ced25472a03c06f381e}{%
+           family={Morcos},
+           familyi={M\bibinitperiod},
+           given={Ari\bibnamedelima S.},
+           giveni={A\bibinitperiod\bibinitdelim S\bibinitperiod}}}%
+        {{hash=131a250b717dd7f9c99161429a1b2534}{%
+           family={Namkoong},
+           familyi={N\bibinitperiod},
+           given={Hongseok},
+           giveni={H\bibinitperiod}}}%
+        {{hash=396c6ddedb6f986906fc3e4994d19974}{%
+           family={Farhadi},
+           familyi={F\bibinitperiod},
+           given={Ali},
+           giveni={A\bibinitperiod}}}%
+        {{hash=c3a96990f646f64a86d9ab03ad479056}{%
+           family={Carmon},
+           familyi={C\bibinitperiod},
+           given={Yair},
+           giveni={Y\bibinitperiod}}}%
+        {{hash=7fc0edf04cce351dda404579ede3d0d1}{%
+           family={Kornblith},
+           familyi={K\bibinitperiod},
+           given={Simon},
+           giveni={S\bibinitperiod}}}%
+        {{hash=bca2cf46e9eed1a3bcc54f4286b4e013}{%
+           family={Schmidt},
+           familyi={S\bibinitperiod},
+           given={Ludwig},
+           giveni={L\bibinitperiod}}}%
+      }
+      \strng{namehash}{8893e3add7fe6ee2894f3331a8e56590}
+      \strng{fullhash}{60e1bd4c23bcd25e0859b78114faefcf}
+      \strng{fullhashraw}{60e1bd4c23bcd25e0859b78114faefcf}
+      \strng{bibnamehash}{8893e3add7fe6ee2894f3331a8e56590}
+      \strng{authorbibnamehash}{8893e3add7fe6ee2894f3331a8e56590}
+      \strng{authornamehash}{8893e3add7fe6ee2894f3331a8e56590}
+      \strng{authorfullhash}{60e1bd4c23bcd25e0859b78114faefcf}
+      \strng{authorfullhashraw}{60e1bd4c23bcd25e0859b78114faefcf}
+      \field{sortinit}{W}
+      \field{sortinithash}{4315d78024d0cea9b57a0c6f0e35ed0d}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{eprintclass}{cs.LG}
+      \field{eprinttype}{arXiv}
+      \field{title}{Model soups: averaging weights of multiple fine-tuned models improves accuracy without increasing inference time}
+      \field{year}{2022}
+      \verb{eprint}
+      \verb 2203.05482
+      \endverb
+      \verb{urlraw}
+      \verb https://arxiv.org/abs/2203.05482
+      \endverb
+      \verb{url}
+      \verb https://arxiv.org/abs/2203.05482
+      \endverb
+    \endentry
+  \enddatalist
+  \missing{attention}
+\endrefsection
+\endinput
+
